@@ -1,0 +1,7 @@
+runtime: nodejs20 # Use the version of Node.js you're using
+env: standard
+env_variables:  # Environment variables needed for your app
+  OPENAI_API_KEY: "sk-proj-cgLD6i4EcY8d7z7xPh3NT3BlbkFJ4dPuwhuKTdf1zy1YAXCe"
+handlers:
+- url: /.*
+  script: auto
