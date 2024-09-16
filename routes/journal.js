@@ -5,6 +5,21 @@ const router = express.Router();
 const JournalEntry = require('../models/JournalEntry'); // Import the JournalEntry model
 const auth = require('../middleware/auth'); // Middleware to authenticate users
 
+// Helper function to get the start and end of the current month
+const getMonthRange = () => {
+    const start = new Date();
+    start.setDate(1); // Set to the first day of the month
+    start.setHours(0, 0, 0, 0); // Set time to the start of the day
+
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1); // Move to the next month
+    end.setDate(0); // Set to the last day of the current month
+    end.setHours(23, 59, 59, 999); // Set time to the end of the day
+
+    return { start, end };
+};
+
+
 // Create a new journal entry for the logged-in user
 router.post('/add', auth, async (req, res) => {
     const {
@@ -13,7 +28,23 @@ router.post('/add', auth, async (req, res) => {
     } = req.body;
 
     try {
-        // Create a new journal entry
+        const { start, end } = getMonthRange();
+
+        // Count the user's journal entries for the current month
+        const entryCount = await JournalEntry.countDocuments({
+            userId: req.user.id,
+            date: { $gte: start, $lte: end }
+        });
+
+        // Check if the user has reached the monthly limit
+        if (entryCount >= 31) {
+            return res.status(400).json({ error: 'You have reached the maximum of 31 journal entries for this month.' });
+        }
+
+
+
+
+          // Create a new journal entry
         const newEntry = new JournalEntry({
             userId: req.user.id,  // Automatically associate the journal entry with the logged-in user
             alcohol,
