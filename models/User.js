@@ -29,27 +29,33 @@ const userSchema = new Schema({
     },
     height: {
         type: Number,
-        required: false
+        required: false,
+        default:null
     },
     weight: {
         type: Number,
-        required: false
+        required: false,
+        default: null
     },
     dietaryPreferences: {
         type: String,
-        required: false
+        required: false,
+        default: ''
     },
     activityLevel: {
         type: String,
-        required: false
+        required: false,
+        default: ''
     },
     healthGoals: {
         type: [String],
-        required: false
+        required: false,
+        default: []
     },
     mentalHealthGoals: {
         type: [String],
-        required: false
+        required: false,
+        default: []
     },
     membership: {
         type: String,
@@ -57,11 +63,13 @@ const userSchema = new Schema({
     },
     favouriteIngredients: {
         type: [String],
-        required: false
+        required: false,
+        default: []
     },
     dislikedIngredients: {
         type: [String],
-        required: false
+        required: false,
+        default: []
     },
 
     cuisinePreferences: {

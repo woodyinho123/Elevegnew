@@ -8,6 +8,8 @@ const OpenAI = require('openai');
 const Recommendations = require('../models/Recommendation');
 const JournalEntry = require('../models/JournalEntry'); // Import the JournalEntry model
 const openai = new OpenAI();
+const { generateNextWeekMealPlan } = require('../services/mealPlanService');
+
 
 // Helper function to extract insights from journal entries over the last 4 weeks
 const extractJournalInsights = async (userId) => {
@@ -55,17 +57,34 @@ const extractJournalInsights = async (userId) => {
     };
 };
 
-router.post('/next4weeks', auth, async (req, res) => {
-    const { user_data, crop_data } = req.body; // Data from the request body
+// Generate meal plan for the next week
+router.post('/nextweek', auth, async (req, res) => {
+    const { user_data, crop_data } = req.body;
 
     try {
         // Step 1: Get journal insights from the past 4 weeks
         const journalInsights = await extractJournalInsights(req.user.id);
 
-        // Step 2: Construct the OpenAI prompt with the gathered data
-        const prompt = constructPromptForNextWeeks(user_data, crop_data, journalInsights);
+        // Step 2: Find the user's existing recommendation document or create a new one if not found
+        let userRecommendations = await Recommendations.findOne({ userId: req.user.id });
+        let nextWeek = 1; // Default to week 1 if no recommendations are found
 
-        // Step 3: Call OpenAI to generate the meal plan for the next four weeks
+        if (userRecommendations) {
+            // Find the last week generated and calculate the next one
+            const existingWeeks = Object.keys(userRecommendations.toObject()).filter(key => key.startsWith('week'));
+            if (existingWeeks.length > 0) {
+                const lastWeek = Math.max(...existingWeeks.map(week => parseInt(week.replace('week', ''))));
+                nextWeek = lastWeek + 1;
+            }
+        } else {
+            // Create a new Recommendations document if not found
+            userRecommendations = new Recommendations({ userId: req.user.id });
+        }
+
+        // Step 3: Construct the OpenAI prompt for the next week
+        const prompt = constructPromptForNextWeek(user_data, crop_data, journalInsights, nextWeek);
+
+        // Step 4: Call OpenAI to generate the meal plan for the next week
         const response = await openai.chat.completions.create({
             model: "gpt-4",
             messages: [{ role: "user", content: prompt }],
@@ -73,51 +92,27 @@ router.post('/next4weeks', auth, async (req, res) => {
         });
 
         // Extract the meal plan from the OpenAI response
-        const recommendations = response.choices[0].message.content;
+        const weekPlan = response.choices[0].message.content;
 
-        // Step 4: Parse the response to separate weeks
-        const weekPlans = recommendations.split(/Week \d:/); // Split based on "Week" labels
-        const week5Plan = weekPlans[1] ? `Week 5:${weekPlans[1].trim()}` : '';
-        const week6Plan = weekPlans[2] ? `Week 6:${weekPlans[2].trim()}` : '';
-        const week7Plan = weekPlans[3] ? `Week 7:${weekPlans[3].trim()}` : '';
-        const week8Plan = weekPlans[4] ? `Week 8:${weekPlans[4].trim()}` : '';
+        // Step 5: Save the meal plan for the next week
+        userRecommendations[`week${nextWeek}`] = weekPlan;
 
-        // Find the user's existing recommendation document or create a new one if not found
-        let userRecommendations = await Recommendations.findOne({ userId: req.user.id });
-
-        if (!userRecommendations) {
-            // If no existing document, create a new one
-            userRecommendations = new Recommendations({
-                userId: req.user.id,
-                week5: week5Plan,
-                week6: week6Plan,
-                week7: week7Plan,
-                week8: week8Plan
-            });
-        } else {
-            // Update the existing document with new weeks
-            userRecommendations.week5 = week5Plan;
-            userRecommendations.week6 = week6Plan;
-            userRecommendations.week7 = week7Plan;
-            userRecommendations.week8 = week8Plan;
-        }
-
-        // Save the document (either new or updated)
+        // Step 6: Save the document (either new or updated)
         await userRecommendations.save();
 
-        // Step 5: Return the generated meal plan
-        res.json({ week5: week5Plan, week6: week6Plan, week7: week7Plan, week8: week8Plan });
+        // Step 7: Return the generated meal plan
+        res.json({ week: nextWeek, plan: weekPlan });
     } catch (error) {
-        console.error('Error generating next 4 weeks recommendations:', error.message);
-        res.status(500).json({ error: 'Failed to generate recommendations for the next 4 weeks' });
+        console.error('Error generating next week’s recommendations:', error.message);
+        res.status(500).json({ error: 'Failed to generate recommendations for the next week' });
     }
 });
 
 
 
 
-// Helper function to construct the OpenAI prompt for the next 4 weeks of meal plans
-const constructPromptForNextWeeks = (user_data, crop_data, journalInsights) => {
+// Helper function to construct the OpenAI prompt for the next week's meal plan
+const constructPromptForNextWeek = (user_data, crop_data, journalInsights, weekNumber) => {
     let prompt = `
         User Data:
         Height: ${user_data.Height}
@@ -135,30 +130,37 @@ const constructPromptForNextWeeks = (user_data, crop_data, journalInsights) => {
 
         Available Crops:
     `;
+
+    console.log('crop_data received: ', crop_data); // Log before forEach
+
+    // Ensure crop_data is an array, or set it as an empty array if not properly formatted
+    if (!crop_data || !Array.isArray(crop_data)) {
+        console.error('crop_data is missing or not an array, setting as empty array.');
+        crop_data = []; // Fallback to empty array if crop_data is undefined or not an array
+    }
+
+    // Use forEach only if crop_data is an array
     crop_data.forEach(crop => {
         prompt += `\n- ${crop}`;
     });
 
-    // Requesting separate meal plans for each week
+
+    // Requesting meal plans for a single week
     prompt += `
 
-    Based on the user's profile and recent journal insights, create four unique 7-day meal plans for the next four weeks. Each week's plan should use a variety of the top 5 recommended crops, take note of the user's dietary preferences, activity level, health goals, and recent journal data. Ensure that each week's plan is different and provides variety. Please format your response as follows:
+    Based on the user's profile and recent journal insights, create a unique 7-day meal plan for Week ${weekNumber}. The plan should use a variety of the top 5 recommended crops, take note of the user's dietary preferences, activity level, health goals, and recent journal data. Please format your response as follows:
 
-    Week 5:
+    Week ${weekNumber}:
     Day 1: Breakfast: [Meal], Lunch: [Meal], Dinner: [Meal]
     Day 2: Breakfast: [Meal], Lunch: [Meal], Dinner: [Meal]
     ...
     Day 7: Breakfast: [Meal], Lunch: [Meal], Dinner: [Meal]
 
-    Week 6:
-    Day 1: Breakfast: [Meal], Lunch: [Meal], Dinner: [Meal]
-    ...
-    (Continue similarly for Week 7 and Week 8)
-
-    Make sure each week's meal plan is distinct and considers the crops, user's preferences, and nutritional goals.`;
+    Make sure the plan reflects variety and considers the user's recent journal data.`;
 
     return prompt;
 };
+
 // Endpoint to save recommendations
 router.post('/week1', auth, async (req, res) => {
     const { user_data, crop_data } = req.body;
@@ -490,5 +492,37 @@ router.get('/me', auth, async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+// routes/recommendations.js
+
+
+router.post('/generate-next-week', auth, async (req, res) => {
+    try {
+        const { user_data, crop_data } = req.body;
+
+        // Log to verify if user_data and crop_data exist
+        console.log('Received user_data:', user_data);
+        console.log('Received crop_data:', crop_data);
+
+        if (!user_data || !crop_data) {
+            console.error('user_data or crop_data is missing');
+            return res.status(400).json({ error: 'user_data or crop_data is missing' });
+        }
+
+
+        console.log('Received user_data:', user_data);
+        console.log('Received crop_data:', crop_data);
+
+
+        const user = await User.findById(req.user.id);
+        const nextWeekPlan = await generateNextWeekMealPlan(user, user_data, crop_data);
+        res.json({ plan: nextWeekPlan });
+    } catch (error) {
+        console.error('Error generating next week’s meal plan:', error.message);
+        res.status(500).json({ error: 'Failed to generate the next week’s meal plan' });
+    }
+});
+
+
 
 module.exports = router;
