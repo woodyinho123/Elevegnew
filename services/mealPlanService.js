@@ -167,6 +167,8 @@ async function generateNextWeekMealPlan(user, user_data, crop_data) {
         userRecommendations[`week${nextWeek}`] = weekPlan;
         await userRecommendations.save();
 
+        // Here you add the line to auto-populate the trays after generating the meal plan
+        await autoPopulateTrays(userId);  // <-- ADD THIS LINE
 
         // Add notification logic here after successfully saving the next week's plan
         const newNotification = new Notification({

@@ -21,56 +21,137 @@ const recommendationSchema = new Schema({
         required: true
     },
     week1: {
-        type: String,
-        required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+       
     },
 
     week2: {
-        type: String,
-        required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
+
     },
+
     week3: {
-        type: String,
-        required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
+
     },
     week4: {
-        type: String,
-        required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
+
     },
 
     // Add additional weeks here
     week5: {
-        type: String,
-         required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
+
     },
     week6: {
-        type: String,
-         required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
     },
     week7: {
-        type: String,
-         required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
+
     },
     week8: {
-        type: String,
-         required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
     },
 
     week9: {
-        type: String,
-         required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
+
     },
     week10: {
-        type: String,
-         required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
+
     },
     week11: {
-        type: String,
-         required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
     },
     week12: {
-        type: String,
-         required: false
+        "Day 1": String,
+        "Day 2": String,
+        "Day 3": String,
+        "Day 4": String,
+        "Day 5": String,
+        "Day 6": String,
+        "Day 7": String
+
+
     },
     // You can continue adding fields if more weeks are needed  (look into changing this schema into array if unknown amount of weeks)
     date: {

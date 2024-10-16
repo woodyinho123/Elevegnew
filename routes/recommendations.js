@@ -452,7 +452,7 @@ router.post('/week4', auth, async (req, res) => {
 
 router.post('/saverecommendations', auth, async (req, res) => {
     try {
-        const { week1, week2, week3, week4 } = req.body;
+        const { userId, week1, week2, week3, week4 } = req.body;
         const newRecommendations = new Recommendations({
             userId: req.user.id,
             week1,

@@ -6,7 +6,6 @@ const Tray = require('../models/Tray'); // Importing the Tray model
 const Recommendation = require('../models/Recommendation'); // Importing the Recommendation model
 const auth = require('../middleware/auth'); // Middleware for authentication
 
-// Function to auto-populate trays based on recommendations (meal plans) for Weeks 1 to 4
 const autoPopulateTrays = async (userId) => {
     try {
         // Step 1: Fetch the recommendations for the specific user
@@ -17,18 +16,15 @@ const autoPopulateTrays = async (userId) => {
             return; // Exit if no recommendations are found
         }
 
-        const { week1, week2, week3, week4 } = userRecommendation; // Use weeks 1 to 4
+        // Dynamically get all available weeks from the userRecommendation object
+        const weeks = Object.keys(userRecommendation.toObject())
+            .filter(key => key.startsWith('week')) // Find all fields starting with 'week'
+            .map(weekKey => userRecommendation[weekKey]); // Map to actual week meal plans
 
-        // Log the user and their recommendation for debugging
-        console.log(`Processing recommendations for user: ${userId}`);
-
-        // Step 2: Now we care about all four weeks (1-4)
-        const weeks = [week1, week2, week3, week4]; // Meal plans for weeks 1-4
-
-        // Loop through weeks 1 to 4 (index 0 represents week 1, index 1 for week 2, etc.)
+        // Step 2: Loop through all available weeks (not just limited to weeks 1-4)
         for (let weekIndex = 0; weekIndex < weeks.length; weekIndex++) {
-            const weekMealPlan = weeks[weekIndex]; // Get the meal plan for this week
-            let crops = extractCropsFromMealPlan(weekMealPlan); // Extract crops from the meal plan
+            const weekMealPlan = weeks[weekIndex];
+            let crops = extractCropsFromMealPlan(weekMealPlan);
 
             // Ensure userId is defined
             if (!userId) {
@@ -36,12 +32,11 @@ const autoPopulateTrays = async (userId) => {
                 continue; // Skip if no userId is found
             }
 
-            // **New**: Ensure we have 10 pods by repeating crops if necessary
+            // Ensure we have 10 pods by repeating crops if necessary
             while (crops.length < 10) {
-                crops = crops.concat(crops.slice(0, 10 - crops.length)); // Repeat crops to fill up 10 pods
+                crops = crops.concat(crops.slice(0, 10 - crops.length));
             }
 
-            // Week 1 to Week 4 are included
             let plantingDate = new Date();
             let harvestDate = new Date();
 
@@ -49,8 +44,8 @@ const autoPopulateTrays = async (userId) => {
             plantingDate.setDate(plantingDate.getDate() - (weekIndex * 7)); // Adjust planting date
             harvestDate.setDate(plantingDate.getDate() + 28); // Harvest is 28 days after planting
 
-            // Generate a unique trayId for each user and week (for weeks 1-4)
-            const trayId = `Tray${weekIndex + 1}-${userId.toString()}`; // Tray1 for week 1, Tray2 for week 2, etc.
+            // Generate a unique trayId for each user and week
+            const trayId = `Tray${weekIndex + 1}-${userId.toString()}`;
 
             // Check if a tray already exists for this user and week
             const existingTray = await Tray.findOne({ trayId });
@@ -61,28 +56,27 @@ const autoPopulateTrays = async (userId) => {
 
             // Create a new tray with 10 pods based on the crops from the meal plan
             const newTray = new Tray({
-                userId, // Associate the tray with the user
-                trayId, // Unique tray ID
+                userId,
+                trayId,
                 podData: crops.slice(0, 10).map((crop, index) => ({
                     podId: `Pod${weekIndex + 1}-${index + 1}`, // Unique pod ID for each crop
-                    cropType: crop.cropType, // Crop type from the extracted crops
-                    plantingDate: plantingDate,
-                    harvestDate: harvestDate
+                    cropType: crop.cropType,
+                    plantingDate,
+                    harvestDate,
                 }))
             });
 
-            // Log the creation of the tray for debugging
-            console.log(`Creating tray with userId: ${userId} for Week ${weekIndex + 1}`);
-
             // Save the new tray to the database
             await newTray.save();
+            console.log(`Created tray for userId: ${userId}, trayId: ${trayId} for Week ${weekIndex + 1}`);
         }
 
-        console.log(`Trays auto-populated successfully for user: ${userId} for Weeks 1 to 4.`);
+        console.log(`Trays auto-populated successfully for user: ${userId}`);
     } catch (err) {
         console.error('Error auto-populating trays:', err.message);
     }
 };
+
 
 // Helper function to extract crops from a meal plan (week's recommendation)
 const extractCropsFromMealPlan = (mealPlanString) => {
