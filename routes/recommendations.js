@@ -453,6 +453,12 @@ router.post('/week4', auth, async (req, res) => {
 router.post('/saverecommendations', auth, async (req, res) => {
     try {
         const { userId, week1, week2, week3, week4 } = req.body;
+
+        // Check if all required fields exist in the request body
+        if (!week1 || !week2 || !week3 || !week4) {
+            return res.status(400).json({ error: 'All weeks data must be provided in the request body.' });
+        }
+
         const newRecommendations = new Recommendations({
             userId: req.user.id,
             week1,
@@ -522,6 +528,74 @@ router.post('/generate-next-week', auth, async (req, res) => {
         res.status(500).json({ error: 'Failed to generate the next week’s meal plan' });
     }
 });
+
+// Get a specific day of meals for a user for a specific week
+router.get('/week/:weekNumber/day/:dayNumber', auth, async (req, res) => {
+    try {
+        const { weekNumber, dayNumber } = req.params;
+
+        // Log params for debugging
+        console.log('Requested weekNumber:', weekNumber);
+        console.log('Requested dayNumber:', dayNumber);
+
+        // Ensure week and day are valid
+        if (!weekNumber || !dayNumber) {
+            console.error('Week number or day number is missing.');
+            return res.status(400).json({ error: 'Please provide both weekNumber and dayNumber.' });
+        }
+
+        const recommendations = await Recommendations.findOne({ userId: req.user.id }).lean(); // .lean() converts Mongoose document to plain JS object
+
+        // Log the fetched recommendations object for debugging
+        console.log('User recommendations (full object):', JSON.stringify(recommendations, null, 2));
+
+        if (!recommendations) {
+            console.error('No recommendations found for the user.');
+            return res.status(404).json({ error: 'Recommendations not found for this user.' });
+        }
+
+        // Log fetched data
+        console.log('User recommendations:', recommendations);
+
+        // Step 3: Log the keys in the recommendations object for debugging
+        console.log('Available keys in recommendations:', Object.keys(recommendations));
+
+        // Dynamically access the correct week (e.g., week1, week2, etc.)
+        const weekKey = `week${weekNumber}`;  // Use weekNumber to dynamically create the key
+        const weekPlan = recommendations[weekKey];
+
+        if (!weekPlan) {
+            console.error(`Week ${weekKey} not found for this user.`);
+            return res.status(404).json({ error: `Week ${weekKey} not found for this user.` });
+        }
+
+        // Step 5: Log the found week plan for debugging
+        console.log(`Week ${weekNumber} plan:`, weekPlan);
+
+        // Extract the specified day plan using a regular expression
+        const dayRegex = new RegExp(`Day ${dayNumber}:([^]*?)(?=Day \\d+:|$)`, 'i');
+        const dayPlanMatch = weekPlan.match(dayRegex);
+
+        if (!dayPlanMatch) {
+            console.error(`Day ${dayNumber} not found in week ${weekNumber}.`);
+            return res.status(404).json({ error: `Day ${dayNumber} not found in week ${weekNumber}.` });
+        }
+
+        // Return the extracted day's plan
+        // Log the extracted day's plan for debugging
+        const dayPlan = dayPlanMatch[0];  // This will include the day label (e.g., 'Day 1: ...')
+        console.log(`Extracted plan for day ${dayNumber} of week ${weekNumber}:`, dayPlan);
+
+        res.json({ week: weekNumber, day: dayNumber, plan: dayPlan });
+
+    } catch (err) {
+        console.error('Error fetching day plan:', err.message);
+        res.status(500).json({ error: 'Failed to fetch the requested day plan.' });
+    }
+});
+
+
+
 
 
 

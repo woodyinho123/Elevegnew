@@ -21,136 +21,68 @@ const recommendationSchema = new Schema({
         required: true
     },
     week1: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
+        type: String,  // Ensure this is String to hold long text data
+        required: false
        
     },
 
     week2: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
 
     },
 
     week3: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
 
     },
     week4: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
-
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
     },
 
     // Add additional weeks here
     week5: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
-
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
     },
     week6: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
     },
     week7: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
-
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
     },
     week8: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
-
+        type: String,  // Ensure this is String to hold long text data
+        required: false
     },
 
     week9: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
-
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
     },
     week10: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
-
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
     },
     week11: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
-
+        type: String,  // Ensure this is String to hold long text data
+        required: false
     },
     week12: {
-        "Day 1": String,
-        "Day 2": String,
-        "Day 3": String,
-        "Day 4": String,
-        "Day 5": String,
-        "Day 6": String,
-        "Day 7": String
-
+        type: String,  // Ensure this is String to hold long text data
+        required: false
 
     },
     // You can continue adding fields if more weeks are needed  (look into changing this schema into array if unknown amount of weeks)
@@ -163,3 +95,4 @@ const recommendationSchema = new Schema({
 const Recommendation = mongoose.model('Recommendation', recommendationSchema);
 
 module.exports = Recommendation;
+ 
