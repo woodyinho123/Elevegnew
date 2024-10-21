@@ -452,28 +452,85 @@ router.post('/week4', auth, async (req, res) => {
 
 router.post('/saverecommendations', auth, async (req, res) => {
     try {
-        const { userId, week1, week2, week3, week4 } = req.body;
+        const { week1, week2, week3, week4, week5, week6, week7, week8, week9, week10, week11, week12  } = req.body;
 
         // Check if all required fields exist in the request body
-        if (!week1 || !week2 || !week3 || !week4) {
+        if (!week1 || !week2 || !week3 || !week4 || !week5 || !week6 || !week7 || !week8 || !week9 || !week10 || !week11 || !week12) {
             return res.status(400).json({ error: 'All weeks data must be provided in the request body.' });
         }
+
+        // Week 1 to Week 4 are included
+        let generatedDate = new Date();
+        let week1StartDate = new Date();
+        let week2StartDate = new Date();
+        let week3StartDate = new Date();
+        let week4StartDate = new Date();
+        let week5StartDate = new Date();
+        let week6StartDate = new Date();
+        let week7StartDate = new Date();
+        let week8StartDate = new Date();
+        let week9StartDate = new Date();
+        let week10StartDate = new Date();
+        let week11StartDate = new Date();
+        let week12StartDate = new Date();
+
+
+
+        generatedDate.setDate(generatedDate.getDate());
+        week1StartDate.setDate(week1StartDate.getDate() + 28);
+        week2StartDate.setDate(week2StartDate.getDate() + 35);
+        week3StartDate.setDate(week3StartDate.getDate() + 42);
+        week4StartDate.setDate(week4StartDate.getDate() + 49);
+        week5StartDate.setDate(week5StartDate.getDate() + 56);
+        week6StartDate.setDate(week6StartDate.getDate() + 63);
+        week7StartDate.setDate(week7StartDate.getDate() + 70);
+        week8StartDate.setDate(week8StartDate.getDate() + 77);
+        week9StartDate.setDate(week9StartDate.getDate() + 84);
+        week10StartDate.setDate(week10StartDate.getDate() + 91);
+        week11StartDate.setDate(week11StartDate.getDate() + 98);
+        week12StartDate.setDate(week12StartDate.getDate() + 105);
 
         const newRecommendations = new Recommendations({
             userId: req.user.id,
             week1,
             week2,
             week3,
-            week4
+            week4,
+            week5,
+            week6,
+            week7,
+            week8,
+            week9,
+            week10,
+            week11,
+            week12,
+          
+            generatedDate,
+            week1StartDate,
+            week2StartDate,
+            week3StartDate,
+            week4StartDate,
+            week5StartDate,
+            week6StartDate,
+            week7StartDate,
+            week8StartDate,
+            week9StartDate,
+            week10StartDate,
+            week11StartDate,
+            week12StartDate
+          
         });
 
-        const saveRecommendations = await newRecommendations.save();       
+        const saveRecommendations = await newRecommendations.save();
         res.json(saveRecommendations);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
     }
 });
+
+
+
 
 router.get('/', auth, async (req, res) => {
     try {

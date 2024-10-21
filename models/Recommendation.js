@@ -86,13 +86,67 @@ const recommendationSchema = new Schema({
 
     },
     // You can continue adding fields if more weeks are needed  (look into changing this schema into array if unknown amount of weeks)
-    date: {
+    generateddate: {
+        type: Date,
+        default: Date.now
+    },
+    week1StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week2StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week3StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week4StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week5StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week6StartDate: {
+        type: Date,
+        default: Date.now 
+    },
+    week7StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week8StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week9StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week10StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week11StartDate: {
+        type: Date,
+        default: Date.now
+    },
+    week12StartDate: {
         type: Date,
         default: Date.now
     }
+
+
+
 }, { collection: 'recommendations' });
 
 const Recommendation = mongoose.model('Recommendation', recommendationSchema);
 
 module.exports = Recommendation;
- 
+
+
+
+
