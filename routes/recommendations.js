@@ -452,10 +452,10 @@ router.post('/week4', auth, async (req, res) => {
 
 router.post('/saverecommendations', auth, async (req, res) => {
     try {
-        const { week1, week2, week3, week4, week5, week6, week7, week8, week9, week10, week11, week12  } = req.body;
+        const { week1, week2, week3, week4 } = req.body;
 
         // Check if all required fields exist in the request body
-        if (!week1 || !week2 || !week3 || !week4 || !week5 || !week6 || !week7 || !week8 || !week9 || !week10 || !week11 || !week12) {
+        if (!week1 || !week2 || !week3 || !week4) {
             return res.status(400).json({ error: 'All weeks data must be provided in the request body.' });
         }
 
@@ -496,15 +496,7 @@ router.post('/saverecommendations', auth, async (req, res) => {
             week2,
             week3,
             week4,
-            week5,
-            week6,
-            week7,
-            week8,
-            week9,
-            week10,
-            week11,
-            week12,
-          
+
             generatedDate,
             week1StartDate,
             week2StartDate,
@@ -518,7 +510,7 @@ router.post('/saverecommendations', auth, async (req, res) => {
             week10StartDate,
             week11StartDate,
             week12StartDate
-          
+
         });
 
         const saveRecommendations = await newRecommendations.save();
