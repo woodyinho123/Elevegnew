@@ -47,7 +47,7 @@ const job = schedule.scheduleJob('0 0 * * 0', async function () {
             const nextWeekPlan = await generateNextWeekMealPlan(user);
 
             // Notify the user that their next week's plan is ready
-            const newNotification = new Notification({
+            const newNotification = new Notification({ 
                 userId: user._id,
                 type: 'reminder',
                 message: 'Your next week’s meal plan is ready!',

@@ -9,6 +9,7 @@ const Recommendations = require('../models/Recommendation');
 const JournalEntry = require('../models/JournalEntry'); // Import the JournalEntry model
 const openai = new OpenAI();
 const { generateNextWeekMealPlan } = require('../services/mealPlanService');
+const { getDailyDatesForWeek } = require('../utils/dateUtils'); // Import the helper function
 
 
 // Helper function to extract insights from journal entries over the last 4 weeks
@@ -632,7 +633,7 @@ router.get('/week/:weekNumber/day/:dayNumber', auth, async (req, res) => {
 
         // Return the extracted day's plan
         // Log the extracted day's plan for debugging
-        const dayPlan = dayPlanMatch[0];  // This will include the day label (e.g., 'Day 1: ...')
+        const dayPlan = dayPlanMatch[1].trim();  // This will include the day label (e.g., 'Day 1: ...')
         console.log(`Extracted plan for day ${dayNumber} of week ${weekNumber}:`, dayPlan);
 
         res.json({ week: weekNumber, day: dayNumber, plan: dayPlan });
@@ -644,7 +645,47 @@ router.get('/week/:weekNumber/day/:dayNumber', auth, async (req, res) => {
 });
 
 
+// New route to get daily dates for a specific week
+router.get('/week/:weekNumber/dates', auth, async (req, res) => {
+    console.log('Request received to fetch daily dates');
+    console.log("GET request received for /week/:weekNumber/dates route"); // This will log when the route is accessed
+    const { weekNumber } = req.params;
+    try {
+        // Fetch the user's recommendation with the specified week
+        const recommendation = await Recommendations.findOne({ userId: req.user.id }).lean();
+        console.log('Recommendation document:', recommendation);
 
+
+        if (!recommendation) {
+            console.error(`No recommendations found for user ID: ${req.user.id}`);
+            return res.status(404).json({ error: 'No recommendations found for this user.' });
+        }
+
+        // Identify the week's start date field dynamically
+        const weekStartDate = recommendation[`week${weekNumber}StartDate`];
+        if (!weekStartDate) {
+            return res.status(404).json({ error: `Start date for week ${weekNumber} not found.` });
+        }
+
+
+
+        // Calculate daily dates for the specified week
+        const dailyDates = getDailyDatesForWeek(new Date(weekStartDate));
+        console.log(`Week ${weekNumber} start date:`, weekStartDate);
+
+        // Respond with each date for the week
+        res.json({
+            week: weekNumber,
+            dailyDates: dailyDates.map((date, index) => ({
+                dayNumber: index + 1,
+                date
+            }))
+        });
+    } catch (err) {
+        console.error('Error fetching daily dates:', err.message);
+        res.status(500).json({ error: 'Failed to fetch daily dates for the specified week.' });
+    }
+});
 
 
 
