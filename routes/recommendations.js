@@ -72,7 +72,10 @@ router.post('/nextweek', auth, async (req, res) => {
 
         if (userRecommendations) {
             // Find the last week generated and calculate the next one
-            const existingWeeks = Object.keys(userRecommendations.toObject()).filter(key => key.startsWith('week'));
+            const existingWeeks = Object.keys(userRecommendations.toObject())
+                .filter(key => key.startsWith('week') && !key.endsWith('StartDate') && userRecommendations[key]);
+
+
             if (existingWeeks.length > 0) {
                 const lastWeek = Math.max(...existingWeeks.map(week => parseInt(week.replace('week', ''))));
                 nextWeek = lastWeek + 1;
