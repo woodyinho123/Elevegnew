@@ -12,6 +12,10 @@ const podSchema = new Schema({
         type: String, // Type of crop assigned to this pod......
         required: true
     },
+    cropRef: {
+        type: mongoose.Schema.Types.ObjectId, // New field as reference to the Crop model
+        ref: 'Crop'
+    },
     plantingDate: {
         type: Date, // Date when the crop was planted
         required: true

@@ -7,6 +7,9 @@ const schedule = require('node-schedule');
 const Notification = require('./models/Notification');
 const User = require('./models/User'); // Import the User model
 const generateNextWeekMealPlan = require('./services/mealPlanService').generateNextWeekMealPlan; // Assuming mealPlanService will be created
+const ordersRouter = require('./routes/orders');
+
+
 // Load environment variables
 dotenv.config();
 
@@ -36,7 +39,7 @@ app.use('/api/trays', require('./routes/tray'));
 app.use('/api/auto-population', require('./routes/autoPopulation'));
 app.use('/api/mealplan', mealPlanMetrics);
 app.use('/api/journal', require('./routes/journal'));  // Journal routes
-
+app.use('/api/orders', ordersRouter);
 
 const job = schedule.scheduleJob('0 0 * * 0', async function () {
     try {
