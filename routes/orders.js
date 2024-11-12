@@ -29,9 +29,12 @@ router.post('/generate-cart', auth, async (req, res) => {
         const seedQuantities = {};
         trays.forEach(tray => {
             tray.podData.forEach(pod => {
+                console.log(`Processing pod with cropType: ${pod.cropType}, quantity: ${pod.quantity}`);
                 const cropId = cropNameToIdMap[pod.cropType]; // Look up cropId by name
                 if (cropId) {
-                    seedQuantities[cropId] = (seedQuantities[cropId] || 0) + (pod.quantity || 0);
+                    // Use a default quantity of 1 if pod.quantity is undefined
+                    const quantity = pod.quantity !== undefined ? pod.quantity : 1;
+                    seedQuantities[cropId] = (seedQuantities[cropId] || 0) + quantity;
                 } else {
                     console.warn(`Crop type ${pod.cropType} not found in NutritionTip collection`);
                 }
