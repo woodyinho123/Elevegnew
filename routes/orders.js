@@ -66,6 +66,63 @@ router.post('/generate-cart', auth, async (req, res) => {
     }
 });
 
+// Populate cart based on a single tray
+router.post('/generate-cart/:trayId', auth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { trayId } = req.params;
+
+        // Step 1: Retrieve the specific tray for the user
+        const tray = await Tray.findOne({ userId, _id: trayId });
+        if (!tray) {
+            return res.status(404).json({ error: 'Tray not found for the user' });
+        }
+
+        // Step 2: Retrieve all crop data from nutritiontips
+        const nutritionTips = await NutritionTip.find();
+        const cropNameToIdMap = {};
+        nutritionTips.forEach(nutritionTip => {
+            cropNameToIdMap[nutritionTip.name] = nutritionTip._id;
+        });
+
+        // Step 3: Aggregate seed requirements from the specific tray
+        const seedQuantities = {};
+        tray.podData.forEach(pod => {
+            console.log(`Processing pod with cropType: ${pod.cropType}, quantity: ${pod.quantity}`);
+            const cropId = cropNameToIdMap[pod.cropType];
+            if (cropId) {
+                const quantity = pod.quantity !== undefined ? pod.quantity : 1;
+                seedQuantities[cropId] = (seedQuantities[cropId] || 0) + quantity;
+            } else {
+                console.warn(`Crop type ${pod.cropType} not found in NutritionTip collection`);
+            }
+        });
+
+        // Step 4: Create cart items array
+        const cartItems = Object.keys(seedQuantities).map(cropId => ({
+            cropId,
+            quantity: seedQuantities[cropId]
+        }));
+
+        // Step 5: Check if a draft cart already exists for this tray
+        let cart = await Order.findOne({ userId, status: 'draft', trayId });
+        if (cart) {
+            // Update existing draft cart with new items
+            cart.items = cartItems;
+        } else {
+            // Create new draft cart specifically for this tray
+            cart = new Order({ userId, trayId, items: cartItems, status: 'draft' });
+        }
+
+        // Step 6: Save the cart
+        await cart.save();
+        res.json({ message: 'Cart generated successfully for tray', order: cart });
+    } catch (error) {
+        console.error('Error generating cart for tray:', error);
+        res.status(500).json({ error: 'Failed to generate cart for tray' });
+    }
+});
+
 // Get the draft cart
 router.get('/cart', auth, async (req, res) => {
     try {
@@ -113,6 +170,8 @@ router.put('/cart/item', auth, async (req, res) => {
         res.status(500).json({ error: 'Failed to update cart' });
     }
 });
+
+
 
 // Confirm the cart and place the order
 router.post('/cart/confirm', auth, async (req, res) => {

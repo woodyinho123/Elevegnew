@@ -11,6 +11,7 @@ const orderSchema = new Schema({
         }
     ],
     status: { type: String, default: 'draft' },
+    trayId: { type: mongoose.Schema.Types.ObjectId, ref: 'Tray', required: false }, // Optional trayId field
     createdDate: { type: Date, default: Date.now }
 });
 
