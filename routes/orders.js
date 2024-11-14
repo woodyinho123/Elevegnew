@@ -138,6 +138,26 @@ router.get('/cart', auth, async (req, res) => {
     }
 });
 
+// Get the draft cart for a specific tray
+router.get('/cart/:trayId', auth, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { trayId } = req.params;
+
+        // Find the draft cart for the user and specific tray
+        const cart = await Order.findOne({ userId, trayId, status: 'draft' }).populate('items.cropId');
+        if (!cart) {
+            return res.status(404).json({ error: 'No draft cart found for the specified tray' });
+        }
+
+        res.json(cart);
+    } catch (error) {
+        console.error('Error fetching cart for tray:', error);
+        res.status(500).json({ error: 'Failed to fetch cart for tray' });
+    }
+});
+
+
 // Update cart item quantity or remove item
 router.put('/cart/item', auth, async (req, res) => {
     const { cropId, quantity } = req.body;
@@ -171,6 +191,42 @@ router.put('/cart/item', auth, async (req, res) => {
     }
 });
 
+// Update quantity of a specific crop in the cart for a specific tray
+router.put('/cart/:trayId/item', auth, async (req, res) => {
+    const { trayId } = req.params;
+    const { cropId, quantity } = req.body;
+
+    try {
+        const userId = req.user.id;
+
+        // Find the draft cart for the specified tray
+        const cart = await Order.findOne({ userId, trayId, status: 'draft' });
+        if (!cart) {
+            return res.status(404).json({ error: 'No draft cart found for the specified tray' });
+        }
+
+        // Find the crop item in the cart
+        const itemIndex = cart.items.findIndex(item => item.cropId.equals(cropId));
+        if (itemIndex === -1) {
+            return res.status(404).json({ error: 'Crop not found in cart for this tray' });
+        }
+
+        if (quantity === 0) {
+            // Remove item if quantity is set to 0
+            cart.items.splice(itemIndex, 1);
+        } else {
+            // Update item quantity
+            cart.items[itemIndex].quantity = quantity;
+        }
+
+        // Save the updated cart
+        await cart.save();
+        res.json({ message: 'Cart updated successfully', cart });
+    } catch (error) {
+        console.error('Error updating crop quantity in cart:', error);
+        res.status(500).json({ error: 'Failed to update crop quantity in cart' });
+    }
+});
 
 
 // Confirm the cart and place the order
@@ -192,5 +248,29 @@ router.post('/cart/confirm', auth, async (req, res) => {
         res.status(500).json({ error: 'Failed to confirm order' });
     }
 });
+
+// Confirm and place an order for a specific tray
+router.post('/cart/:trayId/confirm', auth, async (req, res) => {
+    const { trayId } = req.params;
+    const userId = req.user.id;
+
+    try {
+        // Find the draft cart for the specified tray
+        const cart = await Order.findOne({ userId, trayId, status: 'draft' });
+        if (!cart) {
+            return res.status(404).json({ error: 'No draft cart found for the specified tray' });
+        }
+
+        // Update the status to 'confirmed'
+        cart.status = 'confirmed';
+        await cart.save();
+
+        res.json({ message: 'Order placed successfully for tray', order: cart });
+    } catch (error) {
+        console.error('Error confirming order for tray:', error);
+        res.status(500).json({ error: 'Failed to confirm order for tray' });
+    }
+});
+
 
 module.exports = router;
