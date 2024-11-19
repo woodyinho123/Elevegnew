@@ -20,6 +20,8 @@ const autoPopulateTrays = async (userId) => {
             .filter(key => key.startsWith('week'))
             .map(weekKey => userRecommendation[weekKey]);
 
+        console.log(`Weeks extracted for userId: ${userId}`, weeks);
+
         // Fetch existing trays once for this user
         const existingTrays = await Tray.find({ userId });
         const existingTrayIds = new Set(existingTrays.map(tray => tray.trayId));
@@ -27,10 +29,21 @@ const autoPopulateTrays = async (userId) => {
         // Accumulate new trays in an array for bulk insert
         const traysToInsert = [];
 
+        // Define the starting planting date (base reference date)
+        const basePlantingDate = new Date();
+
         // Loop through each week's meal plan
         for (let weekIndex = 0; weekIndex < weeks.length; weekIndex++) {
             const weekMealPlan = weeks[weekIndex];
             let crops = extractCropsFromMealPlan(weekMealPlan);
+
+            console.log(`Crops extracted for week ${weekIndex + 1}:`, crops);
+
+            // Handle empty crops gracefully
+            if (!crops || crops.length === 0) {
+                console.log(`No crops found in week ${weekIndex + 1} for user: ${userId}`);
+                continue;
+            }
 
             // Ensure we have 14 crops, duplicating if necessary
             while (crops.length < 14) {
@@ -44,11 +57,11 @@ const autoPopulateTrays = async (userId) => {
                 continue;
             }
 
-            // Set planting and harvest dates
-            const plantingDate = new Date();
-            plantingDate.setDate(plantingDate.getDate() - (weekIndex * 7));
-            const harvestDate = new Date(plantingDate);
-            harvestDate.setDate(harvestDate.getDate() + 28);
+            // Calculate planting and harvest dates for the tray
+            const trayPlantingDate = new Date(basePlantingDate.getTime());
+            trayPlantingDate.setDate(basePlantingDate.getDate() + (weekIndex * 7));
+            const trayHarvestDate = new Date(trayPlantingDate);
+            trayHarvestDate.setDate(trayPlantingDate.getDate() + 28);
 
             // Create tray data with 14 pods
             const newTray = {
@@ -57,8 +70,8 @@ const autoPopulateTrays = async (userId) => {
                 podData: crops.slice(0, 14).map((crop, index) => ({
                     podId: `Pod${weekIndex + 1}-${index + 1}`,
                     cropType: crop.cropType,
-                    plantingDate,
-                    harvestDate
+                    plantingDate: trayPlantingDate,
+                    harvestDate: trayHarvestDate
                 })),
                 createdAt: new Date(),
                 updatedAt: new Date()
@@ -67,15 +80,18 @@ const autoPopulateTrays = async (userId) => {
             console.log(`Prepared tray for userId: ${userId}, trayId: ${trayId}`);
         }
 
-        // Insert all new trays in a single bulk operation
-        if (traysToInsert.length > 0) {
-            await Tray.insertMany(traysToInsert);
-            console.log(`Inserted ${traysToInsert.length} new trays for user: ${userId}`);
+        // Insert trays in smaller batches
+        const batchSize = 10;
+        for (let i = 0; i < traysToInsert.length; i += batchSize) {
+            await Tray.insertMany(traysToInsert.slice(i, i + batchSize));
         }
+
+        console.log(`Inserted ${traysToInsert.length} new trays for user: ${userId}`);
     } catch (err) {
-        console.error('Error in auto-populating trays:', err.message);
+        console.error('Error in auto-populating trays:', err);
     }
 };
+
 
 
 
