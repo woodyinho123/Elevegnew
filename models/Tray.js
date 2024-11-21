@@ -38,6 +38,9 @@ const traySchema = new Schema({
         required: true
     },
     podData: [podSchema], // Array of pod data
+
+    skipped: { type: Boolean, default: false }, // Add a skipped flag
+
     createdAt: {
         type: Date,
         default: Date.now

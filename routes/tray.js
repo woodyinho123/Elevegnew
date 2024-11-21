@@ -26,27 +26,45 @@ router.post('/', auth, async (req, res) => {
 // Get all trays
 router.get('/', auth, async (req, res) => {
     try {
-        const trays = await Tray.find();
-        res.json(trays);
+        const trays = await Tray.find({ userId: req.user.id }); // Ensure you fetch trays for the logged-in user
+
+        // Include the `skipped` status for each tray
+        const traysWithSkippedStatus = trays.map(tray => ({
+            trayId: tray.trayId,
+            podData: tray.podData,
+            skipped: tray.skipped || false, // Default to false if not set
+            updatedAt: tray.updatedAt
+        }));
+
+        res.json(traysWithSkippedStatus);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
     }
 });
 
+
 // Get a specific tray by ID
 router.get('/:trayId', auth, async (req, res) => {
     try {
-        const tray = await Tray.findOne({ trayId: req.params.trayId });
+        const tray = await Tray.findOne({ trayId: req.params.trayId, userId: req.user.id });
         if (!tray) {
             return res.status(404).json({ msg: 'Tray not found' });
         }
-        res.json(tray);
+
+        // Include the `skipped` status in the response
+        res.json({
+            trayId: tray.trayId,
+            podData: tray.podData,
+            skipped: tray.skipped || false, // Default to false if not set
+            updatedAt: tray.updatedAt
+        });
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
     }
 });
+
 
 
 // Get crops for a specific day in a given week
@@ -148,5 +166,35 @@ router.get('/week/:weekNumber/day/:dayNumber', auth, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch crops for the specified day.' });
     }
 });
+
+// Skip or unskip a tray (planting week)
+router.put('/week/:weekNumber/skip', auth, async (req, res) => {
+    try {
+        const { weekNumber } = req.params;
+        const { skip } = req.body; // Boolean: true for skip, false for unskip
+        const userId = req.user.id;
+
+        const trayId = `Tray${weekNumber}-${userId}`;
+        const tray = await Tray.findOne({ userId, trayId });
+
+        if (!tray) {
+            return res.status(404).json({ error: `Tray for week ${weekNumber} not found.` });
+        }
+
+        // Update the skip status
+        tray.skipped = skip;
+        tray.updatedAt = new Date();
+        await tray.save();
+
+        res.json({
+            message: `Tray for week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} successfully.`,
+            tray
+        });
+    } catch (err) {
+        console.error('Error skipping/unskipping tray:', err.message);
+        res.status(500).json({ error: 'Failed to skip/unskip the tray.' });
+    }
+});
+
 
 module.exports = router;

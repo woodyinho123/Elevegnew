@@ -10,6 +10,7 @@ const JournalEntry = require('../models/JournalEntry'); // Import the JournalEnt
 const openai = new OpenAI();
 const { generateNextWeekMealPlan } = require('../services/mealPlanService');
 const { getDailyDatesForWeek } = require('../utils/dateUtils'); // Import the helper function
+const Tray = require('../models/Tray'); // Adjust the path if necessary
 
 
 // Helper function to extract insights from journal entries over the last 4 weeks
@@ -540,17 +541,35 @@ router.get('/', auth, async (req, res) => {
 
 router.get('/me', auth, async (req, res) => {
     try {
-        const userId = req.user.id; 
+        const userId = req.user.id;
 
-        const recommendations = await Recommendations.find({ userId: userId });
+        // Fetch recommendations for the logged-in user
+        const recommendations = await Recommendations.findOne({ userId }).lean();
 
-        console.log('Fetched recommendations for user:', userId);
-        res.json(recommendations);
+        if (!recommendations) {
+            return res.status(404).json({ error: 'Recommendations not found for this user.' });
+        }
+
+        // Prepare the response to include week data with `skipped` status
+        const weeks = Object.keys(recommendations)
+            .filter(key => key.startsWith('week') && !key.endsWith('StartDate') && !key.endsWith('Skipped')) // Exclude non-week keys
+            .map(weekKey => {
+                const weekNumber = parseInt(weekKey.replace('week', ''), 10);
+                return {
+                    week: weekNumber,
+                    plan: recommendations[weekKey], // Meal plan for the week
+                    skipped: recommendations[`${weekKey}Skipped`] || false, // Skipped status
+                    startDate: recommendations[`${weekKey}StartDate`] || null // Start date if available
+                };
+            });
+
+        res.json({ userId, weeks });
     } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
+        console.error('Error fetching recommendations:', err.message);
+        res.status(500).json({ error: 'Failed to fetch recommendations.' });
     }
 });
+
 
 // routes/recommendations.js
 
@@ -689,6 +708,102 @@ router.get('/week/:weekNumber/dates', auth, async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch daily dates for the specified week.' });
     }
 });
+
+// Skip or unskip a meal plan week
+router.put('/week/:weekNumber/skip', auth, async (req, res) => {
+    try {
+        const { weekNumber } = req.params;
+        const { skip } = req.body; // Boolean: true for skip, false for unskip
+        const userId = req.user.id;
+
+        const recommendation = await Recommendations.findOne({ userId });
+        if (!recommendation) {
+            return res.status(404).json({ error: 'Recommendations not found' });
+        }
+
+        const weekKey = `week${weekNumber}`;
+        const skipKey = `week${weekNumber}Skipped`;
+
+        // Ensure the week exists in the recommendation
+        if (!(weekKey in recommendation)) {
+            return res.status(400).json({ error: `Week ${weekNumber} does not exist.` });
+        }
+
+        // Update the skip status
+        recommendation[skipKey] = skip;
+        await recommendation.save();
+
+        res.json({
+            message: `Week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} successfully.`,
+            recommendation
+        });
+    } catch (err) {
+        console.error('Error skipping/unskipping week:', err.message);
+        res.status(500).json({ error: 'Failed to skip/unskip the week.' });
+    }
+});
+
+router.put('/week/:weekNumber/skip-all', auth, async (req, res) => {
+    try {
+        const { weekNumber } = req.params;
+        const { skip } = req.body;
+        const userId = req.user.id;
+
+        // Skip the recommendation
+        const recommendation = await Recommendations.findOne({ userId });
+        const weekKey = `week${weekNumber}`;
+        const skipKey = `week${weekNumber}Skipped`;
+        if (recommendation) {
+            recommendation[skipKey] = skip;
+            await recommendation.save();
+        }
+
+        // Skip the tray
+        const trayId = `Tray${weekNumber}-${userId}`;
+        const tray = await Tray.findOne({ userId, trayId });
+        if (tray) {
+            tray.skipped = skip;
+            tray.updatedAt = new Date();
+            await tray.save();
+        }
+
+        res.json({ message: `Week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} for both meal plan and tray.` });
+    } catch (err) {
+        console.error('Error skipping/unskipping all:', err.message);
+        res.status(500).json({ error: 'Failed to skip/unskip the week for both meal plan and tray.' });
+    }
+});
+
+// Get skip status for both Recommendations and Trays for a specific week
+router.get('/week/:weekNumber/skip-status', auth, async (req, res) => {
+    try {
+        const { weekNumber } = req.params;
+        const userId = req.user.id;
+
+        // Fetch Recommendation
+        const recommendation = await Recommendations.findOne({ userId }).lean();
+        const recommendationSkipped = recommendation
+            ? recommendation[`week${weekNumber}Skipped`] || false
+            : null; // null if no recommendation found
+
+        // Fetch Tray
+        const trayId = `Tray${weekNumber}-${userId}`;
+        const tray = await Tray.findOne({ userId, trayId }).lean();
+        const traySkipped = tray ? tray.skipped || false : null; // null if no tray found
+
+        res.json({
+            weekNumber,
+            recommendationSkipped,
+            traySkipped
+        });
+    } catch (err) {
+        console.error('Error fetching skip status:', err.message);
+        res.status(500).json({ error: 'Failed to fetch skip status for the week.' });
+    }
+});
+
+
+
 
 
 
