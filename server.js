@@ -40,6 +40,7 @@ app.use('/api/auto-population', require('./routes/autoPopulation'));
 app.use('/api/mealplan', mealPlanMetrics);
 app.use('/api/journal', require('./routes/journal'));  // Journal routes
 app.use('/api/orders', ordersRouter);
+app.use('/api/game', require('./routes/leaderboard'));
 
 const job = schedule.scheduleJob('0 0 * * 0', async function () {
     try {

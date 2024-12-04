@@ -34,6 +34,7 @@ router.post('/generate-cart', auth, async (req, res) => {
                 if (cropId) {
                     // Use a default quantity of 1 if pod.quantity is undefined
                     const quantity = pod.quantity !== undefined ? pod.quantity : 1;
+                    console.log(`Aggregating cropType ${pod.cropType}, cropId: ${cropId}, quantity: ${quantity}`);
                     seedQuantities[cropId] = (seedQuantities[cropId] || 0) + quantity;
                 } else {
                     console.warn(`Crop type ${pod.cropType} not found in NutritionTip collection`);
@@ -66,7 +67,6 @@ router.post('/generate-cart', auth, async (req, res) => {
     }
 });
 
-// Populate cart based on a single tray
 router.post('/generate-cart/:trayId', auth, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -78,21 +78,20 @@ router.post('/generate-cart/:trayId', auth, async (req, res) => {
             return res.status(404).json({ error: 'Tray not found for the user' });
         }
 
-        // Step 2: Retrieve all crop data from nutritiontips
+        // Step 2: Retrieve all crop data from NutritionTip
         const nutritionTips = await NutritionTip.find();
         const cropNameToIdMap = {};
         nutritionTips.forEach(nutritionTip => {
-            cropNameToIdMap[nutritionTip.name] = nutritionTip._id;
+            cropNameToIdMap[nutritionTip.name] = nutritionTip._id; // Mapping crop name to its ObjectId
         });
 
         // Step 3: Aggregate seed requirements from the specific tray
-        const seedQuantities = {};
+        const seedQuantities = {}; // To hold the aggregated quantities
         tray.podData.forEach(pod => {
-            console.log(`Processing pod with cropType: ${pod.cropType}, quantity: ${pod.quantity}`);
-            const cropId = cropNameToIdMap[pod.cropType];
+            const cropId = cropNameToIdMap[pod.cropType]; // Map cropType to cropId
             if (cropId) {
-                const quantity = pod.quantity !== undefined ? pod.quantity : 1;
-                seedQuantities[cropId] = (seedQuantities[cropId] || 0) + quantity;
+                const quantity = pod.quantity || 1; // Default to 1 if undefined
+                seedQuantities[cropId] = (seedQuantities[cropId] || 0) + quantity; // Aggregate quantities
             } else {
                 console.warn(`Crop type ${pod.cropType} not found in NutritionTip collection`);
             }
@@ -105,7 +104,7 @@ router.post('/generate-cart/:trayId', auth, async (req, res) => {
         }));
 
         // Step 5: Check if a draft cart already exists for this tray
-        let cart = await Order.findOne({ userId, status: 'draft', trayId });
+        let cart = await Order.findOne({ userId, trayId, status: 'draft' });
         if (cart) {
             // Update existing draft cart with new items
             cart.items = cartItems;
@@ -122,6 +121,7 @@ router.post('/generate-cart/:trayId', auth, async (req, res) => {
         res.status(500).json({ error: 'Failed to generate cart for tray' });
     }
 });
+
 
 // Get the draft cart
 router.get('/cart', auth, async (req, res) => {

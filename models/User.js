@@ -95,7 +95,18 @@ const userSchema = new Schema({
         type: String, // This is a Yes/No option
         enum: ['Yes', 'No'],
         required: false
+    },
+
+    
+    gameRegistration: {
+        type: Boolean,
+        default: false
+    },
+    gameScore: {
+        type: Number,
+        default: 0
     }
+
 
 }, { collection: 'User' });
 

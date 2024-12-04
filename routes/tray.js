@@ -179,7 +179,7 @@ router.put('/week/:weekNumber/skip', auth, async (req, res) => {
 
         if (!tray) {
             return res.status(404).json({ error: `Tray for week ${weekNumber} not found.` });
-        }
+        } 
 
         // Update the skip status
         tray.skipped = skip;
