@@ -11,7 +11,7 @@ const openai = new OpenAI();
 const { generateNextWeekMealPlan } = require('../services/mealPlanService');
 const { getDailyDatesForWeek } = require('../utils/dateUtils'); // Import the helper function
 const Tray = require('../models/Tray'); // Adjust the path if necessary
-
+const { getNextSundayMidnight } = require('../utils/dateUtils');
 
 // Helper function to extract insights from journal entries over the last 4 weeks
 const extractJournalInsights = async (userId) => {
@@ -459,41 +459,23 @@ router.post('/saverecommendations', auth, async (req, res) => {
     try {
         const { week1, week2, week3, week4 } = req.body;
 
-        // Check if all required fields exist in the request body
         if (!week1 || !week2 || !week3 || !week4) {
             return res.status(400).json({ error: 'All weeks data must be provided in the request body.' });
         }
 
-        // Week 1 to Week 4 are included
-        let generatedDate = new Date();
-        let week1StartDate = new Date();
-        let week2StartDate = new Date();
-        let week3StartDate = new Date();
-        let week4StartDate = new Date();
-        let week5StartDate = new Date();
-        let week6StartDate = new Date();
-        let week7StartDate = new Date();
-        let week8StartDate = new Date();
-        let week9StartDate = new Date();
-        let week10StartDate = new Date();
-        let week11StartDate = new Date();
-        let week12StartDate = new Date();
+        // Calculate the first week's start date as the next Sunday
+        const generatedDate = new Date();
+        const week1StartDate = getNextSundayMidnight(generatedDate);
 
+        // Calculate subsequent weeks' start dates
+        const week2StartDate = new Date(week1StartDate);
+        week2StartDate.setDate(week1StartDate.getDate() + 7);
 
+        const week3StartDate = new Date(week2StartDate);
+        week3StartDate.setDate(week2StartDate.getDate() + 7);
 
-        generatedDate.setDate(generatedDate.getDate());
-        week1StartDate.setDate(week1StartDate.getDate() + 28);
-        week2StartDate.setDate(week2StartDate.getDate() + 35);
-        week3StartDate.setDate(week3StartDate.getDate() + 42);
-        week4StartDate.setDate(week4StartDate.getDate() + 49);
-        week5StartDate.setDate(week5StartDate.getDate() + 56);
-        week6StartDate.setDate(week6StartDate.getDate() + 63);
-        week7StartDate.setDate(week7StartDate.getDate() + 70);
-        week8StartDate.setDate(week8StartDate.getDate() + 77);
-        week9StartDate.setDate(week9StartDate.getDate() + 84);
-        week10StartDate.setDate(week10StartDate.getDate() + 91);
-        week11StartDate.setDate(week11StartDate.getDate() + 98);
-        week12StartDate.setDate(week12StartDate.getDate() + 105);
+        const week4StartDate = new Date(week3StartDate);
+        week4StartDate.setDate(week3StartDate.getDate() + 7);
 
         const newRecommendations = new Recommendations({
             userId: req.user.id,
@@ -501,25 +483,15 @@ router.post('/saverecommendations', auth, async (req, res) => {
             week2,
             week3,
             week4,
-
             generatedDate,
             week1StartDate,
             week2StartDate,
             week3StartDate,
-            week4StartDate,
-            week5StartDate,
-            week6StartDate,
-            week7StartDate,
-            week8StartDate,
-            week9StartDate,
-            week10StartDate,
-            week11StartDate,
-            week12StartDate
-
+            week4StartDate
         });
 
-        const saveRecommendations = await newRecommendations.save();
-        res.json(saveRecommendations);
+        const savedRecommendations = await newRecommendations.save();
+        res.json(savedRecommendations);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server error');
@@ -667,40 +639,40 @@ router.get('/week/:weekNumber/day/:dayNumber', auth, async (req, res) => {
 });
 
 
-// New route to get daily dates for a specific week
 router.get('/week/:weekNumber/dates', auth, async (req, res) => {
-    console.log('Request received to fetch daily dates');
-    console.log("GET request received for /week/:weekNumber/dates route"); // This will log when the route is accessed
-    const { weekNumber } = req.params;
     try {
+        const { weekNumber } = req.params;
+
         // Fetch the user's recommendation with the specified week
         const recommendation = await Recommendations.findOne({ userId: req.user.id }).lean();
-        console.log('Recommendation document:', recommendation);
-
 
         if (!recommendation) {
-            console.error(`No recommendations found for user ID: ${req.user.id}`);
-            return res.status(404).json({ error: 'No recommendations found for this user.' });
+            return res.status(404).json({ error: 'Recommendations not found for this user.' });
         }
 
         // Identify the week's start date field dynamically
-        const weekStartDate = recommendation[`week${weekNumber}StartDate`];
+        const weekStartDateKey = `week${weekNumber}StartDate`;
+        const weekStartDate = recommendation[weekStartDateKey];
+
         if (!weekStartDate) {
             return res.status(404).json({ error: `Start date for week ${weekNumber} not found.` });
         }
 
-
+        // Log the fetched start date
+        console.log(`Fetched weekStartDate for week ${weekNumber}:`, weekStartDate);
 
         // Calculate daily dates for the specified week
         const dailyDates = getDailyDatesForWeek(new Date(weekStartDate));
-        console.log(`Week ${weekNumber} start date:`, weekStartDate);
 
-        // Respond with each date for the week
+        // Log the calculated daily dates
+        console.log(`Calculated daily dates for week ${weekNumber}:`, dailyDates);
+
+        // Respond with the daily dates
         res.json({
             week: weekNumber,
             dailyDates: dailyDates.map((date, index) => ({
                 dayNumber: index + 1,
-                date
+                date: date.toISOString()
             }))
         });
     } catch (err) {
@@ -709,70 +681,85 @@ router.get('/week/:weekNumber/dates', auth, async (req, res) => {
     }
 });
 
-// Skip or unskip a meal plan week
-router.put('/week/:weekNumber/skip', auth, async (req, res) => {
-    try {
-        const { weekNumber } = req.params;
-        const { skip } = req.body; // Boolean: true for skip, false for unskip
-        const userId = req.user.id;
 
+router.put('/week/:weekNumber/skip', auth, async (req, res) => {
+    const { weekNumber } = req.params;
+    const { skip } = req.body; // Boolean: true to skip, false to unskip
+    const userId = req.user.id;
+
+    try {
         const recommendation = await Recommendations.findOne({ userId });
         if (!recommendation) {
-            return res.status(404).json({ error: 'Recommendations not found' });
+            return res.status(404).json({ error: 'Recommendations not found.' });
         }
 
-        const weekKey = `week${weekNumber}`;
         const skipKey = `week${weekNumber}Skipped`;
+        const lockKey = `week${weekNumber}Locked`;
 
-        // Ensure the week exists in the recommendation
-        if (!(weekKey in recommendation)) {
-            return res.status(400).json({ error: `Week ${weekNumber} does not exist.` });
+        if (recommendation[lockKey]) {
+            return res.status(403).json({ error: `Week ${weekNumber} is locked and cannot be skipped.` });
         }
 
-        // Update the skip status
-        recommendation[skipKey] = skip;
+        recommendation[skipKey] = skip; // Update the skipped flag
         await recommendation.save();
 
-        res.json({
-            message: `Week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} successfully.`,
-            recommendation
-        });
+        res.json({ message: `Week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} successfully.` });
     } catch (err) {
-        console.error('Error skipping/unskipping week:', err.message);
-        res.status(500).json({ error: 'Failed to skip/unskip the week.' });
+        console.error('Error updating recommendation skip status:', err.message);
+        res.status(500).json({ error: 'Failed to update recommendation skip status.' });
     }
 });
+
 
 router.put('/week/:weekNumber/skip-all', auth, async (req, res) => {
-    try {
-        const { weekNumber } = req.params;
-        const { skip } = req.body;
-        const userId = req.user.id;
+    const { weekNumber } = req.params;
+    const { skip } = req.body; // Boolean: true to skip, false to unskip
+    const userId = req.user.id;
 
-        // Skip the recommendation
+    try {
+        // Fetch Recommendation
         const recommendation = await Recommendations.findOne({ userId });
-        const weekKey = `week${weekNumber}`;
-        const skipKey = `week${weekNumber}Skipped`;
-        if (recommendation) {
-            recommendation[skipKey] = skip;
-            await recommendation.save();
+        if (!recommendation) {
+            return res.status(404).json({ error: 'Recommendations not found.' });
         }
 
-        // Skip the tray
+        const recommendationLockKey = `week${weekNumber}Locked`;
+        const recommendationSkipKey = `week${weekNumber}Skipped`;
+
+        // Check if the recommendation is locked
+        if (recommendation[recommendationLockKey]) {
+            return res.status(403).json({ error: `Week ${weekNumber} recommendations are locked and cannot be skipped.` });
+        }
+
+        // Fetch Tray
         const trayId = `Tray${weekNumber}-${userId}`;
         const tray = await Tray.findOne({ userId, trayId });
-        if (tray) {
-            tray.skipped = skip;
-            tray.updatedAt = new Date();
-            await tray.save();
+
+        if (!tray) {
+            return res.status(404).json({ error: `Tray for week ${weekNumber} not found.` });
         }
 
-        res.json({ message: `Week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} for both meal plan and tray.` });
+        // Check if the tray is locked
+        if (tray.locked) {
+            return res.status(403).json({ error: `Tray for week ${weekNumber} is locked and cannot be skipped.` });
+        }
+
+        // Update both Recommendation and Tray if not locked
+        recommendation[recommendationSkipKey] = skip;
+        tray.skipped = skip;
+        tray.updatedAt = new Date();
+
+        // Save changes
+        await recommendation.save();
+        await tray.save();
+
+        res.json({ message: `Week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} successfully for both recommendations and tray.` });
     } catch (err) {
-        console.error('Error skipping/unskipping all:', err.message);
-        res.status(500).json({ error: 'Failed to skip/unskip the week for both meal plan and tray.' });
+        console.error('Error skipping all for week:', err.message);
+        res.status(500).json({ error: 'Failed to skip all for the week.' });
     }
 });
+
 
 // Get skip status for both Recommendations and Trays for a specific week
 router.get('/week/:weekNumber/skip-status', auth, async (req, res) => {

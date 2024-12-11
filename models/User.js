@@ -105,7 +105,17 @@ const userSchema = new Schema({
     gameScore: {
         type: Number,
         default: 0
-    }
+    },
+
+      // New Fields for Token Store
+    balance_tokens: {
+        type: Number,
+        default: 100 // Starting tokens
+    },
+    inventory: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Item' // Reference to Item model
+    }]
 
 
 }, { collection: 'User' });

@@ -41,6 +41,8 @@ app.use('/api/mealplan', mealPlanMetrics);
 app.use('/api/journal', require('./routes/journal'));  // Journal routes
 app.use('/api/orders', ordersRouter);
 app.use('/api/game', require('./routes/leaderboard'));
+app.use('/api/token-store', require('./routes/tokenStore'));
+app.use('/api/utils', require('./routes/utils'));
 
 const job = schedule.scheduleJob('0 0 * * 0', async function () {
     try {
@@ -65,6 +67,58 @@ const job = schedule.scheduleJob('0 0 * * 0', async function () {
         console.error('Error generating meal plans:', error.message);
     }
 });
+
+// Scheduled job to auto-confirm orders and lock weeks
+schedule.scheduleJob('0 0 * * 3', async function () { // Runs every Wednesday (3 days after Sunday midnight)
+    try {
+        const users = await User.find();
+
+        for (const user of users) {
+            const currentWeekNumber = getCurrentWeekNumber();
+
+            // Auto-confirm draft orders for the current week
+            const order = await Order.findOne({ userId: user._id, status: 'draft' });
+            if (order) {
+                order.status = 'confirmed';
+                await order.save();
+                console.log(`Order for user ${user._id} auto-confirmed.`);
+            }
+
+            // Lock recommendations for the current week
+            const recommendations = await Recommendations.findOne({ userId: user._id });
+            if (recommendations) {
+                const lockKey = `week${currentWeekNumber}Locked`;
+                recommendations[lockKey] = true;
+                await recommendations.save();
+                console.log(`Recommendations for week ${currentWeekNumber} locked for user ${user._id}`);
+            }
+
+            // Lock trays for the current week
+            const trayId = `Tray${currentWeekNumber}-${user._id}`;
+            const tray = await Tray.findOne({ userId: user._id, trayId });
+            if (tray) {
+                tray.locked = true;
+                tray.updatedAt = new Date();
+                await tray.save();
+                console.log(`Tray for week ${currentWeekNumber} locked for user ${user._id}`);
+            }
+
+            // Notify the user about auto-confirmation and locked status
+            const notification = new Notification({
+                userId: user._id,
+                type: 'info',
+                message: `Your order for week ${currentWeekNumber} has been auto-confirmed. Skipping is now disabled for this week.`,
+                date: new Date()
+            });
+            await notification.save();
+        }
+
+        console.log('Orders auto-confirmed and weeks locked for all users.');
+    } catch (error) {
+        console.error('Error auto-confirming orders:', error.message);
+    }
+});
+
 
 
 

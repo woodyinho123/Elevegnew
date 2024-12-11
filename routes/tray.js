@@ -167,34 +167,34 @@ router.get('/week/:weekNumber/day/:dayNumber', auth, async (req, res) => {
     }
 });
 
-// Skip or unskip a tray (planting week)
 router.put('/week/:weekNumber/skip', auth, async (req, res) => {
-    try {
-        const { weekNumber } = req.params;
-        const { skip } = req.body; // Boolean: true for skip, false for unskip
-        const userId = req.user.id;
+    const { weekNumber } = req.params;
+    const { skip } = req.body; // Boolean: true to skip, false to unskip
+    const userId = req.user.id;
 
-        const trayId = `Tray${weekNumber}-${userId}`;
+    try {
+        const trayId = `Tray${weekNumber}-${userId}`; // Construct the tray ID dynamically
         const tray = await Tray.findOne({ userId, trayId });
 
         if (!tray) {
             return res.status(404).json({ error: `Tray for week ${weekNumber} not found.` });
-        } 
+        }
 
-        // Update the skip status
-        tray.skipped = skip;
-        tray.updatedAt = new Date();
+        if (tray.locked) {
+            return res.status(403).json({ error: `Tray for week ${weekNumber} is locked and cannot be skipped.` });
+        }
+
+        tray.skipped = skip; // Update the skipped flag
+        tray.updatedAt = new Date(); // Update the modification timestamp
         await tray.save();
 
-        res.json({
-            message: `Tray for week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} successfully.`,
-            tray
-        });
+        res.json({ message: `Tray for week ${weekNumber} ${skip ? 'skipped' : 'unskipped'} successfully.` });
     } catch (err) {
-        console.error('Error skipping/unskipping tray:', err.message);
-        res.status(500).json({ error: 'Failed to skip/unskip the tray.' });
+        console.error('Error updating tray skip status:', err.message);
+        res.status(500).json({ error: 'Failed to update tray skip status.' });
     }
 });
+
 
 
 module.exports = router;
