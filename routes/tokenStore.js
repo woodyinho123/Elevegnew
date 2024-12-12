@@ -30,6 +30,13 @@ router.post('/purchase', async (req, res) => {
 
     try {
         console.log(await Item.find());
+        // Log the raw itemId received for debugging
+        console.log(`itemId from request: "${itemId}"`);
+        // Validate itemId format
+        if (!mongoose.Types.ObjectId.isValid(itemId)) {
+            console.error(`Invalid itemId format detected: "${itemId}"`);
+            return res.status(400).json({ error: 'Invalid itemId format.' });
+        }
 
         console.log('itemId:', itemId);
         console.log('isValid ObjectId:', mongoose.Types.ObjectId.isValid(itemId));

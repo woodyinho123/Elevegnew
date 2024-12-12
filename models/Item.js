@@ -1,10 +1,9 @@
 const mongoose = require('mongoose');
-
-const ItemSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    category: { type: String },
-    cost_tokens: { type: Number, required: true },
-    description: { type: String }
+const itemSchema = new mongoose.Schema({
+    name: String,
+    category: String,
+    cost_tokens: Number,
+    description: String,
 });
 
-module.exports = mongoose.model('Item', ItemSchema);
+module.exports = mongoose.model('Item', itemSchema, 'Item'); // Ensure 'Item' matches the actual collection name
