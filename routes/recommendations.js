@@ -58,8 +58,6 @@ const extractJournalInsights = async (userId) => {
         averageMacros
     };
 };
-
-// Generate meal plan for the next week
 router.post('/nextweek', auth, async (req, res) => {
     const { user_data, crop_data } = req.body;
 
@@ -70,21 +68,33 @@ router.post('/nextweek', auth, async (req, res) => {
         // Step 2: Find the user's existing recommendation document or create a new one if not found
         let userRecommendations = await Recommendations.findOne({ userId: req.user.id });
         let nextWeek = 1; // Default to week 1 if no recommendations are found
+        let generatedDate = new Date();
 
         if (userRecommendations) {
             // Find the last week generated and calculate the next one
             const existingWeeks = Object.keys(userRecommendations.toObject())
                 .filter(key => key.startsWith('week') && !key.endsWith('StartDate') && userRecommendations[key]);
 
-
             if (existingWeeks.length > 0) {
                 const lastWeek = Math.max(...existingWeeks.map(week => parseInt(week.replace('week', ''))));
                 nextWeek = lastWeek + 1;
+
+                // Calculate the start date for the next week
+                const lastWeekStartDateKey = `week${lastWeek}StartDate`;
+                const lastWeekStartDate = userRecommendations[lastWeekStartDateKey];
+
+                if (lastWeekStartDate) {
+                    generatedDate = new Date(lastWeekStartDate);
+                    generatedDate.setDate(generatedDate.getDate() + 7);
+                }
             }
         } else {
             // Create a new Recommendations document if not found
             userRecommendations = new Recommendations({ userId: req.user.id });
         }
+
+        // Calculate the next Sunday's date for the new week's start
+        const nextWeekStartDate = getNextSundayMidnight(generatedDate);
 
         // Step 3: Construct the OpenAI prompt for the next week
         const prompt = constructPromptForNextWeek(user_data, crop_data, journalInsights, nextWeek);
@@ -101,12 +111,13 @@ router.post('/nextweek', auth, async (req, res) => {
 
         // Step 5: Save the meal plan for the next week
         userRecommendations[`week${nextWeek}`] = weekPlan;
+        userRecommendations[`week${nextWeek}StartDate`] = nextWeekStartDate;
 
         // Step 6: Save the document (either new or updated)
         await userRecommendations.save();
 
         // Step 7: Return the generated meal plan
-        res.json({ week: nextWeek, plan: weekPlan });
+        res.json({ week: nextWeek, startDate: nextWeekStartDate, plan: weekPlan });
     } catch (error) {
         console.error('Error generating next week’s recommendations:', error.message);
         res.status(500).json({ error: 'Failed to generate recommendations for the next week' });
