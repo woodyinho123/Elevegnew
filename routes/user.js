@@ -127,4 +127,14 @@ router.put('/me', auth, async (req, res) => {
     }
 });
 
+router.get('/user/:userId', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId).populate('inventory');
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch user.' });
+    }
+});
+
+
 module.exports = router;

@@ -8,8 +8,8 @@ const Notification = require('./models/Notification');
 const User = require('./models/User'); // Import the User model
 const generateNextWeekMealPlan = require('./services/mealPlanService').generateNextWeekMealPlan; // Assuming mealPlanService will be created
 const ordersRouter = require('./routes/orders');
-
-
+const userRoutes = require('./routes/user');
+const seedPodsRoutes = require('./routes/seedPods');
 // Load environment variables
 dotenv.config();
 
@@ -43,6 +43,8 @@ app.use('/api/orders', ordersRouter);
 app.use('/api/game', require('./routes/leaderboard'));
 app.use('/api/token-store', require('./routes/tokenStore'));
 app.use('/api/utils', require('./routes/utils'));
+app.use('/api', userRoutes);
+app.use('/api', seedPodsRoutes);
 
 const job = schedule.scheduleJob('0 0 * * 0', async function () {
     try {

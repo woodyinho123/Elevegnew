@@ -2,6 +2,15 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+// Define the schema for individual seed pods
+const seedPodSchema = new Schema({
+    growthDays: { type: Number, default: 0 },
+    growthToday: { type: Number, default: 0 },
+    lastGrowthDate: { type: Date, default: null },
+    status: { type: String, default: "growing" }
+}, { _id: true }); // Enable automatic _id generation for subdocuments
+
+
 // Define the schema first
 const userSchema = new Schema({
     email: {
@@ -96,8 +105,6 @@ const userSchema = new Schema({
         enum: ['Yes', 'No'],
         required: false
     },
-
-    
     gameRegistration: {
         type: Boolean,
         default: false
@@ -107,6 +114,7 @@ const userSchema = new Schema({
         default: 0
     },
 
+    seedPods: [seedPodSchema], // Use the seedPod schema for subdocuments
       // New Fields for Token Store
     balance_tokens: {
         type: Number,
@@ -116,8 +124,6 @@ const userSchema = new Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Item' // Reference to Item model
     }]
-
-
 }, { collection: 'User' });
 
 // Create the model based on the schema

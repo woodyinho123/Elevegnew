@@ -8,14 +8,24 @@ const User = require('../models/User');
 router.post('/register', async (req, res) => {
     const { email, username, password, phone, profile } = req.body;
     console.log('Register request body:', req.body);
+
     try {
         let user = await User.findOne({ email });
         if (user) {
             return res.status(400).json({ msg: 'User already exists' });
         }
 
+          // Generate 14 seed pods during registration
+        const seedPods = Array.from({ length: 14 }, () => ({
+            growthDays: 0,
+            growthToday: 0,
+            lastGrowthDate: null,
+            status: 'growing'
+        }));
+
+
         // Storing password as plain text (Not recommended for production)
-        user = new User({ email, username, password, phone, profile });
+        user = new User({ email, username, password, phone, profile, seedPods });
         await user.save();
 
         console.log('Plaintext Password during Registration:', user.password);
