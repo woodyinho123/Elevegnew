@@ -7,7 +7,15 @@ const seedPodSchema = new Schema({
     growthDays: { type: Number, default: 0 },
     growthToday: { type: Number, default: 0 },
     lastGrowthDate: { type: Date, default: null },
-    status: { type: String, default: "growing" }
+    status: {
+        type: String,
+        enum: ['unplanted', 'growing', 'ready for harvest'],
+        default: 'unplanted',
+    },
+    planted: {
+        type: Boolean,
+        default: false, // New field to track if the pod is planted
+    }
 }, { _id: true }); // Enable automatic _id generation for subdocuments
 
 
