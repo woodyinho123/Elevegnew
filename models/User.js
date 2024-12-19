@@ -9,7 +9,7 @@ const seedPodSchema = new Schema({
     lastGrowthDate: { type: Date, default: null },
     status: {
         type: String,
-        enum: ['unplanted', 'growing', 'ready for harvest'],
+        enum: ['unplanted', 'growing', 'ready for harvest', 'harvested'],
         default: 'unplanted',
     },
     planted: {

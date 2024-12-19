@@ -10,6 +10,7 @@ const generateNextWeekMealPlan = require('./services/mealPlanService').generateN
 const ordersRouter = require('./routes/orders');
 const userRoutes = require('./routes/user');
 const seedPodsRoutes = require('./routes/seedPods');
+const cron = require('node-cron');
 // Load environment variables
 dotenv.config();
 
@@ -118,6 +119,36 @@ schedule.scheduleJob('0 0 * * 3', async function () { // Runs every Wednesday (3
         console.log('Orders auto-confirmed and weeks locked for all users.');
     } catch (error) {
         console.error('Error auto-confirming orders:', error.message);
+    }
+});
+
+
+// Background job to automatically harvest pods
+cron.schedule('0 0 * * *', async () => {
+    console.log('Running the auto-harvest job (every minute)...');
+
+    try {
+        const users = await User.find();
+
+        users.forEach(async (user) => {
+            let podsUpdated = false;
+
+            user.seedPods.forEach((pod) => {
+                if (pod.growthDays >= 28 && pod.status === 'growing') {
+                    pod.status = 'harvested';
+                    podsUpdated = true;
+                }
+            });
+
+            if (podsUpdated) {
+                await user.save();
+                console.log(`Harvested pods for user ${user._id}`);
+            }
+        });
+
+        console.log('Auto-harvest job completed.');
+    } catch (error) {
+        console.error('Error during auto-harvest job:', error);
     }
 });
 
