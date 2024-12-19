@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const resetPodDailyUsage = require('../utils/resetPodDailyUsage');
+
 
 // Fetch all seed pods for a user
 router.get('/:userId/pods', async (req, res) => {
@@ -14,12 +16,11 @@ router.get('/:userId/pods', async (req, res) => {
         res.status(500).json({ error: "Failed to fetch seed pods." });
     }
 });
-// Apply Water Route
 router.post('/:userId/pods/:podId/apply-water', async (req, res) => {
     try {
         const { userId, podId } = req.params;
 
-        // Fetch user and seed pod
+        // Fetch user and pod
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
@@ -30,7 +31,15 @@ router.post('/:userId/pods/:podId/apply-water', async (req, res) => {
             return res.status(404).json({ error: 'Pod not found.' });
         }
 
-        // Ensure the pod is planted
+        // Reset daily limits for the pod if necessary
+        resetPodDailyUsage(pod);
+
+        // Check daily water usage limit for this pod
+        if (pod.dailyWaterUsage + 4 > 8) {
+            return res.status(400).json({ error: 'Daily water usage limit (8 virtual days) exceeded for this pod.' });
+        }
+
+        // Ensure pod is planted
         if (!pod.planted) {
             return res.status(400).json({ error: 'Pod is not planted. Please plant it first.' });
         }
@@ -40,10 +49,11 @@ router.post('/:userId/pods/:podId/apply-water', async (req, res) => {
             return res.status(400).json({ error: 'Exceeded daily growth limit (10 virtual days).' });
         }
 
-        // Apply 4 virtual days of growth
+        // Apply water
         pod.growthDays += 4;
         pod.growthToday += 4;
-        pod.lastGrowthDate = new Date();
+        pod.dailyWaterUsage += 4;
+        pod.lastUsageDate = new Date();
 
         // Check if pod is ready for harvest
         if (pod.growthDays >= 28) {
@@ -59,12 +69,12 @@ router.post('/:userId/pods/:podId/apply-water', async (req, res) => {
 });
 
 
-// Apply Fertilizer Route
+
 router.post('/:userId/pods/:podId/apply-fertilizer', async (req, res) => {
     try {
         const { userId, podId } = req.params;
 
-        // Fetch user and seed pod
+        // Fetch user and pod
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
@@ -75,7 +85,15 @@ router.post('/:userId/pods/:podId/apply-fertilizer', async (req, res) => {
             return res.status(404).json({ error: 'Pod not found.' });
         }
 
-        // Ensure the pod is planted
+        // Reset daily limits for the pod if necessary
+        resetPodDailyUsage(pod);
+
+        // Check daily fertilizer usage limit for this pod
+        if (pod.dailyFertilizerUsage + 2 > 2) {
+            return res.status(400).json({ error: 'Daily fertilizer usage limit (2 virtual days) exceeded for this pod.' });
+        }
+
+        // Ensure pod is planted
         if (!pod.planted) {
             return res.status(400).json({ error: 'Pod is not planted. Please plant it first.' });
         }
@@ -85,10 +103,11 @@ router.post('/:userId/pods/:podId/apply-fertilizer', async (req, res) => {
             return res.status(400).json({ error: 'Exceeded daily growth limit (10 virtual days).' });
         }
 
-        // Apply 2 virtual days of growth
+        // Apply fertilizer
         pod.growthDays += 2;
         pod.growthToday += 2;
-        pod.lastGrowthDate = new Date();
+        pod.dailyFertilizerUsage += 2;
+        pod.lastUsageDate = new Date();
 
         // Check if pod is ready for harvest
         if (pod.growthDays >= 28) {
@@ -102,6 +121,8 @@ router.post('/:userId/pods/:podId/apply-fertilizer', async (req, res) => {
         res.status(500).json({ error: 'Failed to apply fertilizer.' });
     }
 });
+
+
 
 
 

@@ -6,6 +6,9 @@ const Schema = mongoose.Schema;
 const seedPodSchema = new Schema({
     growthDays: { type: Number, default: 0 },
     growthToday: { type: Number, default: 0 },
+    dailyWaterUsage: { type: Number, default: 0 }, // Tracks daily water usage
+    dailyFertilizerUsage: { type: Number, default: 0 }, // Tracks daily fertilizer usage
+    lastUsageDate: { type: Date, default: null }, // Tracks the last usage date for this pod
     lastGrowthDate: { type: Date, default: null },
     status: {
         type: String,
@@ -132,6 +135,9 @@ const userSchema = new Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Item' // Reference to Item model
     }]
+
+    
+
 }, { collection: 'User' });
 
 // Create the model based on the schema
