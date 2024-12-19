@@ -14,76 +14,98 @@ router.get('/:userId/pods', async (req, res) => {
         res.status(500).json({ error: "Failed to fetch seed pods." });
     }
 });
-
-// Apply Water to a Seed Pod
+// Apply water to a seed pod
 router.post('/:userId/pods/:podId/apply-water', async (req, res) => {
     const { userId, podId } = req.params;
 
     try {
         const user = await User.findById(userId);
-        if (!user) return res.status(404).json({ error: "User not found." });
 
-        const pod = user.seedPods.id(podId);
-        if (!pod) return res.status(404).json({ error: "Seed pod not found." });
-
-        const today = new Date().toISOString().split('T')[0];
-        const lastGrowthDate = pod.lastGrowthDate ? pod.lastGrowthDate.toISOString().split('T')[0] : null;
-
-        let growthToday = (lastGrowthDate === today) ? pod.growthToday : 0;
-
-        if (growthToday + 4 > 10) {
-            return res.status(400).json({ error: "Cannot exceed 10 virtual days of growth today." });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
         }
 
-        // Apply Water
+        const pod = user.seedPods.id(podId);
+
+        if (!pod) {
+            return res.status(404).json({ error: 'Seed pod not found.' });
+        }
+
+        // Calculate the new growth
+        const now = new Date();
+        const lastGrowthDate = pod.lastGrowthDate || new Date(0); // Default to epoch if null
+        const isNewDay = now.toDateString() !== lastGrowthDate.toDateString();
+
+        if (isNewDay) {
+            // Reset growthToday on a new real-life day
+            pod.growthToday = 0;
+            pod.lastGrowthDate = now;
+        }
+
+        // Check if the virtual day limits are exceeded
+        if (pod.growthToday + 4 > 10) {
+            return res.status(400).json({ error: 'You cannot exceed 10 virtual days of growth today.' });
+        }
+
+        if (pod.growthDays + 4 > 10) {
+            return res.status(400).json({ error: 'Total growth cannot exceed 10 days per real-life day.' });
+        }
+
+        // Increment growth
+        pod.growthToday += 4;
         pod.growthDays += 4;
-        pod.growthToday = growthToday + 4;
-        pod.lastGrowthDate = new Date();
 
-        if (pod.growthDays >= 28) pod.status = 'ready';
-
+        // Save user data
         await user.save();
-        res.json({ message: "Water applied successfully!", updatedPod: pod });
+
+        res.json({ message: 'Water applied successfully.', pod });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: "Failed to apply water." });
+        res.status(500).json({ error: 'An error occurred while applying water.' });
     }
 });
 
-// Apply Fertilizer to a Seed Pod
+// Apply Fertilizer Route
 router.post('/:userId/pods/:podId/apply-fertilizer', async (req, res) => {
-    const { userId, podId } = req.params;
-
     try {
+        const { userId, podId } = req.params;
+
+        // Fetch user and locate the pod
         const user = await User.findById(userId);
-        if (!user) return res.status(404).json({ error: "User not found." });
-
-        const pod = user.seedPods.id(podId);
-        if (!pod) return res.status(404).json({ error: "Seed pod not found." });
-
-        const today = new Date().toISOString().split('T')[0];
-        const lastGrowthDate = pod.lastGrowthDate ? pod.lastGrowthDate.toISOString().split('T')[0] : null;
-
-        let growthToday = (lastGrowthDate === today) ? pod.growthToday : 0;
-
-        if (growthToday + 2 > 10) {
-            return res.status(400).json({ error: "Cannot exceed 10 virtual days of growth today." });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
         }
 
-        // Apply Fertilizer
+        const pod = user.seedPods.id(podId); // Use subdocument querying
+        if (!pod) {
+            return res.status(404).json({ error: 'Pod not found.' });
+        }
+
+        // Ensure growthToday + 2 does not exceed 10
+        if (pod.growthToday + 2 > 10) {
+            return res.status(400).json({ error: 'Exceeded daily growth limit (10 virtual days).' });
+        }
+
+        // Apply 2 virtual days of growth
         pod.growthDays += 2;
-        pod.growthToday = growthToday + 2;
+        pod.growthToday += 2;
         pod.lastGrowthDate = new Date();
 
-        if (pod.growthDays >= 28) pod.status = 'ready';
+        // Check if pod is ready for harvest
+        if (pod.growthDays >= 28) {
+            pod.status = 'ready for harvest';
+        }
 
+        // Save user document
         await user.save();
-        res.json({ message: "Fertilizer applied successfully!", updatedPod: pod });
+
+        res.json({ success: true, message: 'Fertilizer applied successfully!', pod });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Failed to apply fertilizer." });
+        console.error('Error applying fertilizer:', error);
+        res.status(500).json({ error: 'Failed to apply fertilizer.' });
     }
 });
+
 
 // Harvest Seed Pod
 router.post('/:userId/pods/:podId/harvest', async (req, res) => {
