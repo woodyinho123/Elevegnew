@@ -21,6 +21,10 @@ const seedPodSchema = new Schema({
     }
 }, { _id: true }); // Enable automatic _id generation for subdocuments
 
+const traySchema = new Schema({
+    number: { type: Number, required: true }, // Tray number (1-4)
+    purchasedAt: { type: Date, default: Date.now }, // Purchase timestamp
+});
 
 // Define the schema first
 const userSchema = new Schema({
@@ -131,6 +135,10 @@ const userSchema = new Schema({
         type: Number,
         default: 100 // Starting tokens
     },
+
+    trays: [traySchema], // Array to store trays
+    
+
     inventory: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Item' // Reference to Item model

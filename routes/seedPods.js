@@ -195,6 +195,30 @@ router.post('/:userId/pods/:podId/plant', async (req, res) => {
     }
 });
 
+router.post('/:userId/pods/:podId/assign-tray', async (req, res) => {
+    const { userId, podId } = req.params;
+    const { trayNumber } = req.body; // Tray number to assign the pod to
+
+    try {
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+
+        const pod = user.seedPods.id(podId);
+        if (!pod) return res.status(404).json({ error: 'Seed pod not found.' });
+
+        const tray = user.trays.find((t) => t.number === trayNumber);
+        if (!tray) return res.status(400).json({ error: 'Tray not found or invalid tray number.' });
+
+        // Assign the seed pod to the tray
+        pod.tray = tray.number;
+        await user.save();
+
+        res.json({ success: true, message: 'Seed pod assigned to tray successfully!', pod });
+    } catch (error) {
+        console.error('Error assigning seed pod to tray:', error);
+        res.status(500).json({ error: 'Failed to assign seed pod to tray.' });
+    }
+});
 
 
 

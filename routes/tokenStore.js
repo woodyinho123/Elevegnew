@@ -32,65 +32,38 @@ router.post('/purchase', async (req, res) => {
     const { userId, itemId } = req.body;
 
     try {
-        // Validate itemId format
         if (!mongoose.Types.ObjectId.isValid(itemId)) {
             return res.status(400).json({ error: 'Invalid itemId format.' });
         }
 
-        // Fetch the user and item
         const user = await User.findById(userId);
         const item = await Item.findById(itemId);
 
         if (!user) return res.status(404).json({ error: 'User not found.' });
         if (!item) return res.status(404).json({ error: 'Item not found.' });
 
-        // Debug logs
-        console.log('User inventory before purchase:', user.inventory);
-        console.log('Item to be purchased:', item);
-
-        // Check tray limit
-        if (item.name === 'Tray') {
-            const userTrays = user.inventory.filter(i => i.toString() === itemId);
-            console.log('Current Tray Count:', userTrays.length);
-
-            if (userTrays.length >= 4) { // 1 initial + 3 additional trays
-                console.log('Tray limit exceeded. Cannot purchase more.');
-                return res.status(400).json({ error: 'You cannot purchase more than 3 additional trays.' });
-            }
-        }
-
-        // Check if the user has enough tokens
         if (user.balance_tokens < item.cost_tokens) {
             return res.status(400).json({ error: 'Insufficient tokens.' });
         }
 
-        // Deduct tokens and add the item to the user's inventory
+        // Handle Tray Purchase
+        const trayId = '67584902a6d40e00584cdb9d';
+        if (itemId === trayId) {
+            if (user.trays.length >= 4) {
+                return res.status(400).json({ error: 'You cannot purchase more than 4 trays.' });
+            }
+
+            // Assign the next tray number
+            const trayNumber = user.trays.length + 1;
+            user.trays.push({ number: trayNumber, purchasedAt: new Date() });
+        }
+
+        // Deduct tokens and update inventory
         user.balance_tokens -= item.cost_tokens;
         user.inventory.push(item._id);
 
-        // If the purchased seed matches the specific ObjectId, add a new seed pod
-        const specificSeedId = '675848f8a6d40e00584cdb9b';
-        if (itemId === specificSeedId) {
-            console.log('Purchased seed matches the specific seed ID.');
-
-            // Add a new seed pod
-            const newSeedPod = {
-                growthDays: 0,
-                growthToday: 0,
-                dailyWaterUsage: 0,
-                dailyFertilizerUsage: 0,
-                lastUsageDate: null,
-                status: 'unplanted',
-                planted: false,
-            };
-
-            user.seedPods.push(newSeedPod);
-            console.log('New seed pod added:', newSeedPod);
-        }
-
         await user.save();
 
-        // Log the transaction
         const transaction = new Transaction({
             userId,
             itemId: item._id,
@@ -109,6 +82,7 @@ router.post('/purchase', async (req, res) => {
         res.status(500).json({ error: 'Failed to complete purchase.' });
     }
 });
+
 
 
 

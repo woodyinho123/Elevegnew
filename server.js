@@ -46,6 +46,7 @@ app.use('/api/token-store', require('./routes/tokenStore'));
 app.use('/api/utils', require('./routes/utils'));
 app.use('/api', userRoutes);
 app.use('/api', seedPodsRoutes);
+app.use('/api/seedPods', require('./routes/seedPods'));
 
 const job = schedule.scheduleJob('0 0 * * 0', async function () {
     try {
