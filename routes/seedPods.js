@@ -152,39 +152,56 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
         res.status(500).json({ error: "Failed to harvest pod." });
     }
 });
-
-// Plant Seed Pod Route
 router.post('/:userId/pods/:podId/plant', async (req, res) => {
     try {
         const { userId, podId } = req.params;
 
-        // Find the user and the seed pod
+        // Fetch user and validate existence
         const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found.' });
-        }
+        if (!user) return res.status(404).json({ error: 'User not found.' });
 
+        // Find the seed pod by its ID
         const pod = user.seedPods.id(podId);
-        if (!pod) {
-            return res.status(404).json({ error: 'Pod not found.' });
-        }
+        if (!pod) return res.status(404).json({ error: 'Seed pod not found.' });
 
-        // Check if already planted
-        if (pod.planted) {
-            return res.status(400).json({ error: 'Pod is already planted.' });
+        // Check if the pod is already planted
+        if (pod.planted) return res.status(400).json({ error: 'Pod is already planted.' });
+
+        // DEBUG LOGS
+        console.log('Pod:', pod);
+        console.log('User Inventory:', user.inventory);
+
+        // Validate `pod.tray` and ensure it exists as a tray in the user's inventory
+        const trayId = user.inventory.find(
+            (tray) => tray.toString() === '67584902a6d40e00584cdb9d' // Replace with actual ObjectId for trays (9d)
+        );
+
+        if (!trayId) {
+            console.log(`Tray with ID ${pod.tray} not found in inventory.`);
+            return res.status(400).json({ error: 'Invalid tray selected.' });
         }
 
         // Plant the seed pod
         pod.planted = true;
         pod.status = 'growing';
+
         await user.save();
 
-        res.json({ success: true, message: 'Seed pod successfully planted!', pod });
+        console.log('Pod successfully planted:', pod); // Log successful planting
+        res.json({ success: true, message: 'Seed pod planted successfully!', pod });
     } catch (error) {
         console.error('Error planting seed pod:', error);
         res.status(500).json({ error: 'Failed to plant seed pod.' });
     }
 });
+
+
+
+
+
+
+
+
 
 
 module.exports = router;
