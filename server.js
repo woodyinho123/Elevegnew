@@ -11,6 +11,7 @@ const ordersRouter = require('./routes/orders');
 const userRoutes = require('./routes/user');
 const seedPodsRoutes = require('./routes/seedPods');
 const cron = require('node-cron');
+const Transaction = require('./models/Transaction'); // Ensure this import
 // Load environment variables
 dotenv.config();
 
@@ -125,27 +126,43 @@ schedule.scheduleJob('0 0 * * 3', async function () { // Runs every Wednesday (3
 
 
 // Background job to automatically harvest pods
-cron.schedule('0 0 * * *', async () => {
-    console.log('Running the auto-harvest job (every minute)...');
+cron.schedule('0 0 * * *', async () => { // Runs every day at midnight
+    console.log('Running the auto-harvest job (daily at midnight)...');
 
     try {
         const users = await User.find();
 
-        users.forEach(async (user) => {
-            let podsUpdated = false;
+        for (const user of users) {
+            const podsToHarvest = user.seedPods.filter(pod => pod.growthDays >= 28 && pod.status === 'growing');
 
-            user.seedPods.forEach((pod) => {
-                if (pod.growthDays >= 28 && pod.status === 'growing') {
+            if (podsToHarvest.length > 0) {
+                let transactions = [];
+
+                podsToHarvest.forEach(pod => {
                     pod.status = 'harvested';
-                    podsUpdated = true;
-                }
-            });
+                    user.balance_tokens += 20;
+                    user.gameScore += 20;
 
-            if (podsUpdated) {
+                    // Prepare transaction records
+                    transactions.push({
+                        userId: user._id,
+                        itemId: pod._id, // Adjust as needed
+                        timestamp: new Date(),
+                        amount_tokens: 20,
+                        quantity: 1,
+                        type: 'auto-harvest'
+                    });
+                });
+
+                // Save the updated user
                 await user.save();
-                console.log(`Harvested pods for user ${user._id}`);
+
+                // Insert all transactions at once
+                await Transaction.insertMany(transactions);
+
+                console.log(`Auto-harvested ${podsToHarvest.length} pods for user ${user._id}`);
             }
-        });
+        }
 
         console.log('Auto-harvest job completed.');
     } catch (error) {

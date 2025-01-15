@@ -7,6 +7,8 @@ const User = require('../models/User');
 const Item = require('../models/Item');
 const Transaction = require('../models/Transaction');
 const mongoose = require('mongoose');
+
+
 // Fetch all store items
 router.get('/items', async (req, res) => {
     try {
@@ -28,8 +30,15 @@ router.get('/balance/:userId', async (req, res) => {
     }
 });
 
+// Purchase items with quantity
 router.post('/purchase', async (req, res) => {
-    const { userId, itemId } = req.body;
+    const { userId, itemId, quantity } = req.body;
+
+    // Validate quantity
+    const qty = parseInt(quantity, 10) || 1;
+    if (qty < 1) {
+        return res.status(400).json({ error: 'Quantity must be at least 1.' });
+    }
 
     try {
         if (!mongoose.Types.ObjectId.isValid(itemId)) {
@@ -42,39 +51,68 @@ router.post('/purchase', async (req, res) => {
         if (!user) return res.status(404).json({ error: 'User not found.' });
         if (!item) return res.status(404).json({ error: 'Item not found.' });
 
-        if (user.balance_tokens < item.cost_tokens) {
+        const totalCost = item.cost_tokens * qty;
+
+        if (user.balance_tokens < totalCost) {
             return res.status(400).json({ error: 'Insufficient tokens.' });
         }
 
         // Handle Tray Purchase
-        const trayId = '67584902a6d40e00584cdb9d';
-        if (itemId === trayId) {
-            if (user.trays.length >= 4) {
+        if (item.category === 'tray') { // Ensure category is 'tray'
+            if (user.trays.length + qty > 4) {
                 return res.status(400).json({ error: 'You cannot purchase more than 4 trays.' });
             }
 
-            // Assign the next tray number
-            const trayNumber = user.trays.length + 1;
-            user.trays.push({ number: trayNumber, purchasedAt: new Date() });
+            for (let i = 0; i < qty; i++) {
+                // Assign the next tray number
+                const trayNumber = user.trays.length + 1;
+                user.trays.push({ number: trayNumber, purchasedAt: new Date() });
+            }
         }
 
-        // Deduct tokens and update inventory
-        user.balance_tokens -= item.cost_tokens;
-        user.inventory.push(item._id);
+        // Handle Seed and Seed Box Purchases
+        if (item.category === 'seed' || item.category === 'seedBox') {
+            let seedsToAdd = 0;
+            if (item.category === 'seed') {
+                seedsToAdd = qty;
+            } else if (item.category === 'seedBox') {
+                seedsToAdd = qty * 14; // 14 seeds per box
+            }
+
+            for (let i = 0; i < seedsToAdd; i++) {
+                user.seedPods.push({
+                    // Initialize seed pod with default values
+                    // You can customize initial values if needed
+                });
+            }
+        }
+
+        // Deduct tokens and update inventory (for non-seed items)
+        if (item.category !== 'seed' && item.category !== 'seedBox') {
+            user.balance_tokens -= totalCost;
+            for (let i = 0; i < qty; i++) {
+                user.inventory.push(item._id);
+            }
+        } else {
+            // Deduct tokens for seeds
+            user.balance_tokens -= totalCost;
+        }
 
         await user.save();
 
+        // Record Transaction
         const transaction = new Transaction({
             userId,
             itemId: item._id,
             timestamp: new Date(),
-            amount_tokens: item.cost_tokens,
+            amount_tokens: totalCost,
+            quantity: qty // Optional: Track quantity in transactions
         });
         await transaction.save();
 
         res.json({
             status: 'success',
-            message: `${item.name} purchased successfully!`,
+            message: `${qty} ${item.name}${qty > 1 ? 's' : ''} purchased successfully!`,
             new_balance: user.balance_tokens,
         });
     } catch (error) {
@@ -82,6 +120,9 @@ router.post('/purchase', async (req, res) => {
         res.status(500).json({ error: 'Failed to complete purchase.' });
     }
 });
+
+
+
 
 
 

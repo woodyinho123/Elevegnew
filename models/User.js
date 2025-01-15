@@ -18,7 +18,8 @@ const seedPodSchema = new Schema({
     planted: {
         type: Boolean,
         default: false, // New field to track if the pod is planted
-    }
+    },
+    tray: { type: Number, default: null }, // Add this field
 }, { _id: true }); // Enable automatic _id generation for subdocuments
 
 const traySchema = new Schema({

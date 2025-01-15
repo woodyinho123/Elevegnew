@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const resetPodDailyUsage = require('../utils/resetPodDailyUsage');
-
+const Transaction = require('../models/Transaction'); // Ensure you have this model
 
 // Fetch all seed pods for a user
 router.get('/:userId/pods', async (req, res) => {
@@ -128,6 +128,8 @@ router.post('/:userId/pods/:podId/apply-fertilizer', async (req, res) => {
 
 
 
+
+
 // Harvest Seed Pod
 router.post('/:userId/pods/:podId/harvest', async (req, res) => {
     const { userId, podId } = req.params;
@@ -139,19 +141,40 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
         const pod = user.seedPods.id(podId);
         if (!pod) return res.status(404).json({ error: "Seed pod not found." });
 
-        if (pod.status !== 'ready') {
+        // Ensure the pod is ready for harvest
+        if (pod.status !== 'ready for harvest') {
             return res.status(400).json({ error: "Pod is not ready for harvest." });
         }
 
+        // Update pod status
         pod.status = 'harvested';
+
+        // Award tokens and game score
+        user.balance_tokens += 20;
+        user.gameScore += 20;
+
+        // Create a transaction record
+        const transaction = new Transaction({
+            userId: user._id,
+            itemId: pod._id, // You can use a specific identifier or item ID if applicable
+            timestamp: new Date(),
+            amount_tokens: 20,
+            quantity: 1, // Represents one harvest
+            type: 'harvest' // Optional: to categorize the transaction
+        });
+
+        await transaction.save();
+
+        // Save the updated user
         await user.save();
 
         res.json({ message: "Pod harvested successfully!", harvestedPod: pod });
     } catch (error) {
-        console.error(error);
+        console.error('Error harvesting pod:', error);
         res.status(500).json({ error: "Failed to harvest pod." });
     }
 });
+
 router.post('/:userId/pods/:podId/plant', async (req, res) => {
     try {
         const { userId, podId } = req.params;
