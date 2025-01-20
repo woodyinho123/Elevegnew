@@ -146,23 +146,57 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
             return res.status(400).json({ error: "Pod is not ready for harvest." });
         }
 
+        // Assign Fertilizer (if applicable)
+        const fertilizer = await Fertilizer.findOne({ userId: user._id, expired: false }).sort({ purchasedAt: 1 }); // FIFO
+        if (!fertilizer) {
+            return res.status(400).json({ error: 'No available fertilizer. Please purchase more.' });
+        }
+
+        fertilizer.usesRemaining -= 1;
+        if (fertilizer.usesRemaining <= 0) {
+            fertilizer.expired = true;
+        }
+
+        fertilizer.usesRemaining -= 1;
+        if (fertilizer.usesRemaining <= 0) {
+            fertilizer.expired = true;
+        }
+
+        // Increment harvested pods count for fertilizer
+        fertilizer.harvestedPodsCount += 1;
+
+        // If 14 pods have been harvested, expire the fertilizer
+        if (fertilizer.harvestedPodsCount >= 14) {
+            fertilizer.expired = true;
+        }
+
+        await fertilizer.save();
+
         // Update pod status
         pod.status = 'harvested';
 
-        // Award tokens and game score
+        // Award tokens and game score (base 20)
         user.balance_tokens += 20;
         user.gameScore += 20;
 
-        // Create a transaction record
+        // Check if the user has purchased a solar panel and award extra tokens and score
+        const solarPanelItem = await Item.findOne({ name: 'Solar Panel' });
+        const hasSolarPanel = user.inventory.includes(solarPanelItem._id.toString());
+
+        if (hasSolarPanel) {
+            user.balance_tokens += 25;  // Additional 25 tokens
+            user.gameScore += 25;       // Additional 25 score
+        }
+
+        // Create a transaction record for the harvest
         const transaction = new Transaction({
             userId: user._id,
             itemId: pod._id, // You can use a specific identifier or item ID if applicable
             timestamp: new Date(),
-            amount_tokens: 20,
-            quantity: 1, // Represents one harvest
+            amount_tokens: 25, // The extra tokens for the solar panel
+            quantity: 1,
             type: 'harvest' // Optional: to categorize the transaction
         });
-
         await transaction.save();
 
         // Save the updated user
@@ -174,6 +208,7 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
         res.status(500).json({ error: "Failed to harvest pod." });
     }
 });
+
 
 router.post('/:userId/pods/:podId/plant', async (req, res) => {
     try {
