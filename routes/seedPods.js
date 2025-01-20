@@ -278,6 +278,31 @@ router.post('/:userId/pods/:podId/assign-tray', async (req, res) => {
     }
 });
 
+router.get('/:userId/pods/by-tray/:trayNumber', async (req, res) => {
+    const { userId, trayNumber } = req.params;
+
+    try {
+        // Fetch the user document
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // Fetch all pods belonging to the specified tray number
+        const podsInTray = user.seedPods.filter(pod => pod.tray === parseInt(trayNumber));
+
+        // If no pods are found for the tray number, return a message
+        if (podsInTray.length === 0) {
+            return res.status(404).json({ error: `No pods found for tray number ${trayNumber}.` });
+        }
+
+        // Return the pods associated with the tray
+        res.json({ pods: podsInTray });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch pods by tray number.' });
+    }
+});
 
 
 
