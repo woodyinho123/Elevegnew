@@ -20,6 +20,7 @@ const seedPodSchema = new Schema({
         default: false, // New field to track if the pod is planted
     },
     tray: { type: Number, default: null }, // Add this field
+    position: Number,  
     fertilizerApplied: { type: Boolean, default: false }, // Tracks if fertilizer has been applied at least once
 }, { _id: true }); // Enable automatic _id generation for subdocuments
 

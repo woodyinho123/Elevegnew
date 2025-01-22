@@ -29,85 +29,126 @@ router.get('/balance/:userId', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch balance.' });
     }
 });
+// POST /api/token-store/purchase
+// Purchase an item with tokens (fertilizer, tray, seeds, etc.)
 router.post('/purchase', async (req, res) => {
     const { userId, itemId, quantity } = req.body;
 
     try {
-        // Validate the itemId format
+        // 1) Validate the itemId format
         if (!mongoose.Types.ObjectId.isValid(itemId)) {
             return res.status(400).json({ error: 'Invalid itemId format.' });
         }
 
-        // Fetch the user and item from the database
+        // 2) Find the user and the item
         const user = await User.findById(userId);
         const item = await Item.findById(itemId);
 
-        // Ensure user and item exist
-        if (!user) return res.status(404).json({ error: 'User not found.' });
-        if (!item) return res.status(404).json({ error: 'Item not found.' });
+        // 3) Ensure both user and item exist
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+        if (!item) {
+            return res.status(404).json({ error: 'Item not found.' });
+        }
 
-        // Ensure quantity is a valid number
+        // 4) Parse quantity
         const qty = parseInt(quantity, 10) || 1;
         if (qty < 1) {
             return res.status(400).json({ error: 'Quantity must be at least 1.' });
         }
 
-        // Calculate the total cost of the purchase (item cost * quantity)
+        // 5) Calculate cost and check user tokens
         const totalCost = item.cost_tokens * qty;
-
-        // Check if the user has enough tokens to complete the purchase
         if (user.balance_tokens < totalCost) {
             return res.status(400).json({ error: 'Insufficient tokens.' });
         }
 
-        // Handle purchasing fertilizer (example)
+        // ==================
+        //  HANDLE SEEDS
+        // ==================
+        // If you want to create pods automatically whenever an item with category "seed" or "seedBox" is bought:
+        if (item.category === 'seed' || item.category === 'seedBox') {
+            // A) Check the current number of seed pods
+            const currentPodCount = user.seedPods.length;
+
+            // B) If adding 'qty' seeds would exceed 56 total, block the purchase
+            if (currentPodCount + qty > 56) {
+                return res.status(400).json({
+                    error: `You currently have ${currentPodCount} pods. Buying ${qty} more would exceed the 56-pod limit.`,
+                });
+            }
+
+            // C) For each seed purchased, push a new seed pod to user.seedPods
+            for (let i = 0; i < qty; i++) {
+                user.seedPods.push({
+                    status: 'unplanted',
+                    planted: false,
+                    tray: null,
+                    position: null,
+                    fertilizerApplied: false,
+                    growthDays: 0,
+                    growthToday: 0,
+                    dailyWaterUsage: 0,
+                    dailyFertilizerUsage: 0,
+                    lastUsageDate: null,
+                    lastGrowthDate: null,
+                });
+            }
+        }
+
+        // ===============================
+        //  HANDLE FERTILIZER (SUPPLIES)
+        // ===============================
         if (item.category === 'supplies' && item.name === 'Fertilizer Pack') {
-            // Create and save the new fertilizer
+            // Create and save a new fertilizer document
             const newFertilizer = new Fertilizer({
                 userId: user._id,
-                usesRemaining: 1, // Starting with 1 use
-                harvestedPodsCount: 0 // Starting with 0 pods harvested
+                usesRemaining: 1, // Start with 1
+                harvestedPodsCount: 0,
             });
+            await newFertilizer.save();
 
-            await newFertilizer.save(); // Save the new fertilizer
-
-            // Add fertilizer to the user's inventory (if needed)
+            // Optionally add the fertilizer doc _id to the user's inventory
             user.inventory.push(newFertilizer._id);
         }
 
-        // Handle purchasing tray
+        // ==============
+        //  HANDLE TRAYS
+        // ==============
         if (item.category === 'tray') {
-            // Check if the user already has 4 trays (limit is 4 trays per user)
+            // Check if this purchase would exceed 4 trays
             if (user.trays.length + qty > 4) {
-                return res.status(400).json({ error: 'You cannot purchase more than 4 trays.' });
+                return res
+                    .status(400)
+                    .json({ error: 'You cannot purchase more than 4 trays total.' });
             }
 
-            // Add the specified number of trays to the user's trays array
+            // Add the new trays
             for (let i = 0; i < qty; i++) {
-                // Assign the next tray number
                 const trayNumber = user.trays.length + 1;
                 user.trays.push({ number: trayNumber, purchasedAt: new Date() });
             }
         }
 
-        // Deduct the total cost from the user's balance
+        // 6) Deduct the total cost from user’s tokens
         user.balance_tokens -= totalCost;
 
-        // Save the user with updated balance
+        // 7) Save the user with updated pods/trays/inventory and token balance
         await user.save();
 
-        // Record the transaction (optional)
+        // 8) Create a transaction record
         const transaction = new Transaction({
             userId,
             itemId: item._id,
             timestamp: new Date(),
             amount_tokens: totalCost,
-            quantity: qty
+            quantity: qty,
+            // Optionally add "type", e.g. "seed_purchase" or "tray_purchase"
         });
-
         await transaction.save();
 
-        // Respond to the client with a success message
+        // 9) Respond
         res.json({
             status: 'success',
             message: `${qty} ${item.name}(s) purchased successfully!`,

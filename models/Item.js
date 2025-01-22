@@ -3,7 +3,7 @@
 const mongoose = require('mongoose');
 const itemSchema = new mongoose.Schema({
     name: String,
-    category: String,
+   
     cost_tokens: Number,
     description: String,
     category: {

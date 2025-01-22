@@ -46,12 +46,12 @@ router.post('/:userId/pods/:podId/apply-water', async (req, res) => {
             return res.status(400).json({ error: 'Pod is not planted. Please plant it first.' });
         }
 
-        // Ensure growthToday + 4 does not exceed 10
+        //// Ensure growthToday + 4 does not exceed 10
         if (pod.growthToday + 4 > 10) {
             return res.status(400).json({ error: 'Exceeded daily growth limit (10 virtual days).' });
         }
 
-        // Apply water
+        //// Apply water
         pod.growthDays += 4;
         pod.growthToday += 4;
         pod.dailyWaterUsage += 4;
@@ -100,12 +100,12 @@ router.post('/:userId/pods/:podId/apply-fertilizer', async (req, res) => {
             return res.status(400).json({ error: 'Pod is not planted. Please plant it first.' });
         }
 
-        // Ensure growthToday + 2 does not exceed 10
+        //// Ensure growthToday + 2 does not exceed 10
         if (pod.growthToday + 2 > 10) {
             return res.status(400).json({ error: 'Exceeded daily growth limit (10 virtual days).' });
         }
 
-        // Apply fertilizer
+        //// Apply fertilizer
         pod.growthDays += 2;
         pod.growthToday += 2;
         pod.dailyFertilizerUsage += 2;
@@ -253,9 +253,11 @@ router.post('/:userId/pods/:podId/plant', async (req, res) => {
     }
 });
 
+// routes/seedPods.js
 router.post('/:userId/pods/:podId/assign-tray', async (req, res) => {
     const { userId, podId } = req.params;
-    const { trayNumber } = req.body; // Tray number to assign the pod to
+    // Now we also accept a “position” number in the request body
+    const { trayNumber, position } = req.body;
 
     try {
         const user = await User.findById(userId);
@@ -264,19 +266,39 @@ router.post('/:userId/pods/:podId/assign-tray', async (req, res) => {
         const pod = user.seedPods.id(podId);
         if (!pod) return res.status(404).json({ error: 'Seed pod not found.' });
 
+        // Check if this tray actually exists on the user
         const tray = user.trays.find((t) => t.number === trayNumber);
-        if (!tray) return res.status(400).json({ error: 'Tray not found or invalid tray number.' });
+        if (!tray) {
+            return res.status(400).json({ error: 'Tray not found or invalid tray number.' });
+        }
 
-        // Assign the seed pod to the tray
-        pod.tray = tray.number;
+        // Optional: validate the position is within 1..14, if that’s your tray size
+        if (position < 1 || position > 14) {
+            return res.status(400).json({ error: 'Position must be between 1 and 14.' });
+        }
+
+        // Make sure no other pod on the same tray is already occupying that position
+        const conflict = user.seedPods.find(p =>
+            p._id.toString() !== podId &&      // Not the same pod
+            p.tray === trayNumber &&
+            p.position === position
+        );
+        if (conflict) {
+            return res.status(400).json({ error: 'That position is already occupied by another seed pod.' });
+        }
+
+        // Assign the tray and position
+        pod.tray = trayNumber;
+        pod.position = position;
+
         await user.save();
-
-        res.json({ success: true, message: 'Seed pod assigned to tray successfully!', pod });
+        res.json({ success: true, message: 'Seed pod assigned to tray & position!', pod });
     } catch (error) {
-        console.error('Error assigning seed pod to tray:', error);
-        res.status(500).json({ error: 'Failed to assign seed pod to tray.' });
+        console.error('Error assigning seed pod to tray/position:', error);
+        res.status(500).json({ error: 'Failed to assign seed pod to tray/position.' });
     }
 });
+
 
 router.get('/:userId/pods/by-tray/:trayNumber', async (req, res) => {
     const { userId, trayNumber } = req.params;
