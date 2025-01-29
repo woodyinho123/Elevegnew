@@ -5,6 +5,7 @@ const router = express.Router();
 const User = require('../models/User');
 const resetPodDailyUsage = require('../utils/resetPodDailyUsage');
 const Transaction = require('../models/Transaction'); // Ensure you have this model
+const Fertilizer = require('../models/Fertilizer');
 
 // Fetch all seed pods for a user
 router.get('/:userId/pods', async (req, res) => {
@@ -36,7 +37,7 @@ router.post('/:userId/pods/:podId/apply-water', async (req, res) => {
         // Reset daily limits for the pod if necessary
         resetPodDailyUsage(pod);
 
-        // Check daily water usage limit for this pod
+        //// Check daily water usage limit for this pod
         if (pod.dailyWaterUsage + 4 > 8) {
             return res.status(400).json({ error: 'Daily water usage limit (8 virtual days) exceeded for this pod.' });
         }
@@ -46,12 +47,12 @@ router.post('/:userId/pods/:podId/apply-water', async (req, res) => {
             return res.status(400).json({ error: 'Pod is not planted. Please plant it first.' });
         }
 
-        //// Ensure growthToday + 4 does not exceed 10
+        ////// Ensure growthToday + 4 does not exceed 10
         if (pod.growthToday + 4 > 10) {
             return res.status(400).json({ error: 'Exceeded daily growth limit (10 virtual days).' });
         }
 
-        //// Apply water
+        ////// Apply water
         pod.growthDays += 4;
         pod.growthToday += 4;
         pod.dailyWaterUsage += 4;
@@ -100,16 +101,19 @@ router.post('/:userId/pods/:podId/apply-fertilizer', async (req, res) => {
             return res.status(400).json({ error: 'Pod is not planted. Please plant it first.' });
         }
 
-        //// Ensure growthToday + 2 does not exceed 10
+        // Ensure growthToday + 2 does not exceed 10
         if (pod.growthToday + 2 > 10) {
             return res.status(400).json({ error: 'Exceeded daily growth limit (10 virtual days).' });
         }
 
-        //// Apply fertilizer
+        // Apply fertilizer
         pod.growthDays += 2;
         pod.growthToday += 2;
         pod.dailyFertilizerUsage += 2;
         pod.lastUsageDate = new Date();
+
+        // Track fertilizer application (don't decrement `usesRemaining` here)
+        pod.fertilizerAppliedOnPod = true; // Track that fertilizer was applied
 
         // Check if pod is ready for harvest
         if (pod.growthDays >= 28) {
@@ -146,20 +150,21 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
             return res.status(400).json({ error: "Pod is not ready for harvest." });
         }
 
-        // Assign Fertilizer (if applicable)
+        // Fetch available fertilizer (FIFO: First In First Out)
         const fertilizer = await Fertilizer.findOne({ userId: user._id, expired: false }).sort({ purchasedAt: 1 }); // FIFO
         if (!fertilizer) {
             return res.status(400).json({ error: 'No available fertilizer. Please purchase more.' });
         }
 
-        fertilizer.usesRemaining -= 1;
-        if (fertilizer.usesRemaining <= 0) {
-            fertilizer.expired = true;
-        }
+        // Check if fertilizer was applied to this pod before decrementing uses
+        if (pod.fertilizerAppliedOnPod) {
+            // Decrement usesRemaining by 1, as the pod is being harvested
+            fertilizer.usesRemaining -= 1;
 
-        fertilizer.usesRemaining -= 1;
-        if (fertilizer.usesRemaining <= 0) {
-            fertilizer.expired = true;
+            // If usesRemaining <= 0, mark the fertilizer as expired
+            if (fertilizer.usesRemaining <= 0) {
+                fertilizer.expired = true;
+            }
         }
 
         // Increment harvested pods count for fertilizer
@@ -170,6 +175,7 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
             fertilizer.expired = true;
         }
 
+        // Save the fertilizer state
         await fertilizer.save();
 
         // Update pod status
@@ -199,6 +205,47 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
         });
         await transaction.save();
 
+        // ---------- SOLAR PANEL LOGIC START ----------
+        // Now check if the tray for this pod has an *assigned* solar panel and if all 14 pods are harvested.
+
+        const trayNumber = pod.tray;
+        const tray = user.trays.find(t => t.number === trayNumber);
+
+        if (tray && tray.solarPanel && !tray.solarPanelExpired) {
+            // Count how many pods in this tray are 'harvested'
+            const podsInTray = user.seedPods.filter(p => p.tray === trayNumber);
+            const harvestedCount = podsInTray.filter(p => p.status === 'harvested').length;
+
+            // If the tray has exactly 14 pods and all are harvested
+            if (harvestedCount === 14) {
+                // Award the user 350 tokens & score
+                user.balance_tokens += 350;
+                user.gameScore += 350;
+
+                // Mark the solar panel as expired
+                tray.solarPanelExpired = true;
+
+                // Optionally remove the solarPanel reference so the tray is "free"
+                tray.solarPanel = null;
+
+                // Optionally, create a transaction record for the 350
+                const solarBonusTransaction = new Transaction({
+                    userId: user._id,
+                    itemId: tray.solarPanel, // or some placeholder if you want
+                    timestamp: new Date(),
+                    amount_tokens: 350,
+                    quantity: 1,
+                    type: 'solar-harvest-bonus'
+                });
+                await solarBonusTransaction.save();
+
+                console.log(`Tray ${trayNumber} harvested all 14 pods. Solar panel expired. Awarded 350 tokens & score.`);
+            }
+        }
+        // ---------- SOLAR PANEL LOGIC END ----------
+
+
+
         // Save the updated user
         await user.save();
 
@@ -210,9 +257,13 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
 });
 
 
+
+
 router.post('/:userId/pods/:podId/plant', async (req, res) => {
     try {
         const { userId, podId } = req.params;
+        // Right here, read trayNumber from req.body
+        const { trayNumber } = req.body;
 
         // Fetch user and validate existence
         const user = await User.findById(userId);
@@ -222,22 +273,13 @@ router.post('/:userId/pods/:podId/plant', async (req, res) => {
         const pod = user.seedPods.id(podId);
         if (!pod) return res.status(404).json({ error: 'Seed pod not found.' });
 
-        // Check if the pod is already planted
-        if (pod.planted) return res.status(400).json({ error: 'Pod is already planted.' });
-
-        // DEBUG LOGS
-        console.log('Pod:', pod);
-        console.log('User Inventory:', user.inventory);
-
-        // Validate `pod.tray` and ensure it exists as a tray in the user's inventory
-        const trayId = user.inventory.find(
-            (tray) => tray.toString() === '67584902a6d40e00584cdb9d' // Replace with actual ObjectId for trays (9d)
-        );
-
-        if (!trayId) {
-            console.log(`Tray with ID ${pod.tray} not found in inventory.`);
+        // Remove the old hard-coded check for tray in `inventory`
+        // and replace it with something like:
+        const tray = user.trays.find((t) => t.number === parseInt(trayNumber));
+        if (!tray) {
             return res.status(400).json({ error: 'Invalid tray selected.' });
         }
+
 
         // Plant the seed pod
         pod.planted = true;
@@ -325,6 +367,88 @@ router.get('/:userId/pods/by-tray/:trayNumber', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch pods by tray number.' });
     }
 });
+
+
+// Route to clear all pods from a specific tray
+router.post('/:userId/clear-tray/:trayNumber', async (req, res) => {
+    const { userId, trayNumber } = req.params;
+
+    try {
+        // Fetch the user document
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // Find all pods in the specified tray
+        const podsInTray = user.seedPods.filter(pod => pod.tray === parseInt(trayNumber));
+
+        // If no pods are found for the tray, return a message
+        if (podsInTray.length === 0) {
+            return res.status(404).json({ error: `No pods found in tray number ${trayNumber}.` });
+        }
+
+        // Clear the tray: set tray and position to null for each pod
+        podsInTray.forEach(pod => {
+            pod.tray = null;
+            pod.position = null;
+        });
+
+        // Save the updated user document with cleared pods
+        await user.save();
+
+        // Respond with a success message
+        res.json({ success: true, message: `Tray ${trayNumber} cleared successfully.` });
+    } catch (error) {
+        console.error('Error clearing tray:', error);
+        res.status(500).json({ error: 'Failed to clear tray.' });
+    }
+});
+
+// POST /api/seedPods/:userId/trays/:trayNumber/assign-solar-panel
+router.post('/:userId/trays/:trayNumber/assign-solar-panel', async (req, res) => {
+    const { userId, trayNumber } = req.params;
+    const { solarPanelId } = req.body; // the ID of the solar panel in the user's inventory
+
+    try {
+        // 1) Fetch User
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // 2) Find the tray
+        const tray = user.trays.find((t) => t.number === parseInt(trayNumber));
+        if (!tray) {
+            return res.status(400).json({ error: 'Tray not found.' });
+        }
+
+        // 3) Check if user owns the solar panel (assuming we keep them in user.solarPanels or in user.inventory)
+        //    If you store panels in user.solarPanels, use that. Otherwise, if you store them in "inventory", check there.
+        const panelOwned = user.solarPanels.some((panelId) => panelId.toString() === solarPanelId);
+        if (!panelOwned) {
+            return res.status(400).json({ error: 'User does not own this solar panel.' });
+        }
+
+        // 4) Check if this tray already has a solar panel assigned and not expired
+        if (tray.solarPanel && !tray.solarPanelExpired) {
+            return res.status(400).json({ error: 'This tray already has an active solar panel assigned.' });
+        }
+
+        // 5) Assign the solar panel to the tray
+        tray.solarPanel = solarPanelId;
+        tray.solarPanelExpired = false; // reset in case it was previously expired
+
+        // 6) Save the user
+        await user.save();
+
+        res.json({ success: true, message: `Solar panel assigned to tray ${trayNumber}.`, tray });
+    } catch (error) {
+        console.error('Error assigning solar panel:', error);
+        res.status(500).json({ error: 'Failed to assign solar panel to tray.' });
+    }
+});
+
 
 
 

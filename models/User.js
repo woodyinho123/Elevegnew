@@ -27,6 +27,18 @@ const seedPodSchema = new Schema({
 const traySchema = new Schema({
     number: { type: Number, required: true }, // Tray number (1-4)
     purchasedAt: { type: Date, default: Date.now }, // Purchase timestamp
+
+    solarPanel: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Item',  // or ref: 'SolarPanel' if you had a separate model
+        default: null
+    },
+    solarPanelExpired: {
+        type: Boolean,
+        default: false
+    }
+
+
 });
 
 // Define the schema first
@@ -140,6 +152,19 @@ const userSchema = new Schema({
     },
 
     trays: [traySchema], // Array to store trays
+
+    solarPanels: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Item' // Reference to the Item model (for solar panels)
+    }],
+    windmills: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Item' // Reference to the Item model (for windmills)
+    }],
+    fertilizers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Fertilizer' // Reference to  fertilizer model
+    }],
     
 
     inventory: [{

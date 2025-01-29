@@ -8,7 +8,7 @@ const itemSchema = new mongoose.Schema({
     description: String,
     category: {
         type: String,
-        enum: ['seed', 'seedBox', 'tray', 'other'],
+        enum: ['seed', 'seedBox', 'tray', 'other', 'seedBox', 'equipment', 'Supplies'],
         required: true
     },
 });

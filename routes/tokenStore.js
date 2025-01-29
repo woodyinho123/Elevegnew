@@ -7,6 +7,7 @@ const User = require('../models/User');
 const Item = require('../models/Item');
 const Transaction = require('../models/Transaction');
 const mongoose = require('mongoose');
+const Fertilizer = require('../models/Fertilizer');  // Add this line to import the Fertilizer model
 
 
 // Fetch all store items
@@ -29,22 +30,22 @@ router.get('/balance/:userId', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch balance.' });
     }
 });
-// POST /api/token-store/purchase
-// Purchase an item with tokens (fertilizer, tray, seeds, etc.)
+
+
 router.post('/purchase', async (req, res) => {
     const { userId, itemId, quantity } = req.body;
 
     try {
-        // 1) Validate the itemId format
+        // Validate itemId format
         if (!mongoose.Types.ObjectId.isValid(itemId)) {
             return res.status(400).json({ error: 'Invalid itemId format.' });
         }
 
-        // 2) Find the user and the item
+        // Find the user and item
         const user = await User.findById(userId);
         const item = await Item.findById(itemId);
 
-        // 3) Ensure both user and item exist
+        // Ensure both user and item exist
         if (!user) {
             return res.status(404).json({ error: 'User not found.' });
         }
@@ -52,34 +53,27 @@ router.post('/purchase', async (req, res) => {
             return res.status(404).json({ error: 'Item not found.' });
         }
 
-        // 4) Parse quantity
+        // Parse quantity
         const qty = parseInt(quantity, 10) || 1;
         if (qty < 1) {
             return res.status(400).json({ error: 'Quantity must be at least 1.' });
         }
 
-        // 5) Calculate cost and check user tokens
+        // Calculate cost and check user tokens
         const totalCost = item.cost_tokens * qty;
         if (user.balance_tokens < totalCost) {
             return res.status(400).json({ error: 'Insufficient tokens.' });
         }
 
-        // ==================
-        //  HANDLE SEEDS
-        // ==================
-        // If you want to create pods automatically whenever an item with category "seed" or "seedBox" is bought:
+        // ================== HANDLE SEEDS ==================
         if (item.category === 'seed' || item.category === 'seedBox') {
-            // A) Check the current number of seed pods
             const currentPodCount = user.seedPods.length;
-
-            // B) If adding 'qty' seeds would exceed 56 total, block the purchase
             if (currentPodCount + qty > 56) {
                 return res.status(400).json({
                     error: `You currently have ${currentPodCount} pods. Buying ${qty} more would exceed the 56-pod limit.`,
                 });
             }
 
-            // C) For each seed purchased, push a new seed pod to user.seedPods
             for (let i = 0; i < qty; i++) {
                 user.seedPods.push({
                     status: 'unplanted',
@@ -97,58 +91,53 @@ router.post('/purchase', async (req, res) => {
             }
         }
 
-        // ===============================
-        //  HANDLE FERTILIZER (SUPPLIES)
-        // ===============================
-        if (item.category === 'supplies' && item.name === 'Fertilizer Pack') {
+        // =================== HANDLE FERTILIZER ===================
+        if (item.category === 'Supplies' && item.name === 'Fertilizer Pack') {
             // Create and save a new fertilizer document
             const newFertilizer = new Fertilizer({
                 userId: user._id,
-                usesRemaining: 1, // Start with 1
+                usesRemaining: 14,  // Now starts with 14 uses
                 harvestedPodsCount: 0,
             });
-            await newFertilizer.save();
+            await newFertilizer.save();  // Save the new fertilizer document
 
-            // Optionally add the fertilizer doc _id to the user's inventory
-            user.inventory.push(newFertilizer._id);
+            // Add the fertilizer to the user's inventory (push fertilizer ID)
+            user.fertilizers.push(newFertilizer._id);  // Push fertilizer ID to the array
+            console.log(user.fertilizers);  // Log the fertilizers array
+            // Save the user with the updated inventory
+            await user.save();
         }
 
-        // ==============
-        //  HANDLE TRAYS
-        // ==============
-        if (item.category === 'tray') {
-            // Check if this purchase would exceed 4 trays
-            if (user.trays.length + qty > 4) {
-                return res
-                    .status(400)
-                    .json({ error: 'You cannot purchase more than 4 trays total.' });
-            }
 
-            // Add the new trays
-            for (let i = 0; i < qty; i++) {
-                const trayNumber = user.trays.length + 1;
-                user.trays.push({ number: trayNumber, purchasedAt: new Date() });
-            }
+        // ================== HANDLE SOLAR PANELS ==================
+        if (item.category === 'equipment' && item.name === 'Solar Panel') {
+            // Add solar panel to the user's inventory
+            user.solarPanels.push(item._id);
         }
 
-        // 6) Deduct the total cost from user’s tokens
+        // ================== HANDLE WINDMILLS ==================
+        if (item.category === 'equipment' && item.name === 'Windmill') {
+            // Add windmill to the user's inventory
+            user.windmills.push(item._id);
+        }
+
+        // Deduct the total cost from user’s tokens
         user.balance_tokens -= totalCost;
 
-        // 7) Save the user with updated pods/trays/inventory and token balance
+        // Save the user with updated items and token balance
         await user.save();
 
-        // 8) Create a transaction record
+        // Create a transaction record
         const transaction = new Transaction({
             userId,
             itemId: item._id,
             timestamp: new Date(),
             amount_tokens: totalCost,
             quantity: qty,
-            // Optionally add "type", e.g. "seed_purchase" or "tray_purchase"
         });
         await transaction.save();
 
-        // 9) Respond
+        // Respond
         res.json({
             status: 'success',
             message: `${qty} ${item.name}(s) purchased successfully!`,
@@ -160,14 +149,27 @@ router.post('/purchase', async (req, res) => {
     }
 });
 
+// GET /api/token-store/fertilizers/:userId         get fertilizers uses remaining
+router.get('/fertilizers/:userId', async (req, res) => {
+    const { userId } = req.params;
+    try {
+        // Find all fertilizer documents for this user
+        const fertilizers = await Fertilizer.find({ userId });
+
+        if (!fertilizers || fertilizers.length === 0) {
+            return res.status(404).json({ error: 'No fertilizers found for this user.' });
+        }
+
+        // Respond with an array of fertilizer info
+        res.json({ fertilizers });
+    } catch (error) {
+        console.error('Error fetching fertilizer info:', error);
+        res.status(500).json({ error: 'Failed to fetch fertilizer info.' });
+    }
+});
 
 
 
-
-
-
-
-
-
+   
 
 module.exports = router;
