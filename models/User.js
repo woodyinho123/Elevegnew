@@ -33,12 +33,18 @@ const traySchema = new Schema({
         ref: 'Item',  // or ref: 'SolarPanel' if you had a separate model
         default: null
     },
+    windmill: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Item',
+        default: null
+    },
     solarPanelExpired: {
         type: Boolean,
         default: false
-    }
+    },
+    windmillExpired: { type: Boolean, default: false },
 
-
+    totalHarvests: { type: Number, default: 0 }  // Number of times the tray has been fully harvested (14 pods = 1 harvest)
 });
 
 // Define the schema first

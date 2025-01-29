@@ -151,17 +151,14 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
         }
 
         // Fetch available fertilizer (FIFO: First In First Out)
-        const fertilizer = await Fertilizer.findOne({ userId: user._id, expired: false }).sort({ purchasedAt: 1 }); // FIFO
+        const fertilizer = await Fertilizer.findOne({ userId: user._id, expired: false }).sort({ purchasedAt: 1 });
         if (!fertilizer) {
             return res.status(400).json({ error: 'No available fertilizer. Please purchase more.' });
         }
 
         // Check if fertilizer was applied to this pod before decrementing uses
         if (pod.fertilizerAppliedOnPod) {
-            // Decrement usesRemaining by 1, as the pod is being harvested
             fertilizer.usesRemaining -= 1;
-
-            // If usesRemaining <= 0, mark the fertilizer as expired
             if (fertilizer.usesRemaining <= 0) {
                 fertilizer.expired = true;
             }
@@ -169,44 +166,21 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
 
         // Increment harvested pods count for fertilizer
         fertilizer.harvestedPodsCount += 1;
-
-        // If 14 pods have been harvested, expire the fertilizer
         if (fertilizer.harvestedPodsCount >= 14) {
             fertilizer.expired = true;
         }
 
-        // Save the fertilizer state
         await fertilizer.save();
 
-        // Update pod status
+        // Update pod status to 'harvested'
         pod.status = 'harvested';
 
         // Award tokens and game score (base 20)
         user.balance_tokens += 20;
         user.gameScore += 20;
 
-        // Check if the user has purchased a solar panel and award extra tokens and score
-        const solarPanelItem = await Item.findOne({ name: 'Solar Panel' });
-        const hasSolarPanel = user.inventory.includes(solarPanelItem._id.toString());
-
-        if (hasSolarPanel) {
-            user.balance_tokens += 25;  // Additional 25 tokens
-            user.gameScore += 25;       // Additional 25 score
-        }
-
-        // Create a transaction record for the harvest
-        const transaction = new Transaction({
-            userId: user._id,
-            itemId: pod._id, // You can use a specific identifier or item ID if applicable
-            timestamp: new Date(),
-            amount_tokens: 25, // The extra tokens for the solar panel
-            quantity: 1,
-            type: 'harvest' // Optional: to categorize the transaction
-        });
-        await transaction.save();
-
         // ---------- SOLAR PANEL LOGIC START ----------
-        // Now check if the tray for this pod has an *assigned* solar panel and if all 14 pods are harvested.
+        // Check if the tray for this pod has an *assigned* solar panel and if all 14 pods are harvested.
 
         const trayNumber = pod.tray;
         const tray = user.trays.find(t => t.number === trayNumber);
@@ -244,7 +218,43 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
         }
         // ---------- SOLAR PANEL LOGIC END ----------
 
+        // ---------- WINDMILL LOGIC START ----------
+        if (tray && tray.windmill && !tray.windmillExpired) {
+            // Count how many pods in this tray are 'harvested'
+            const podsInTray = user.seedPods.filter(p => p.tray === trayNumber);
+            const harvestedCount = podsInTray.filter(p => p.status === 'harvested').length;
 
+            // If the tray has exactly 14 pods and all are harvested
+            if (harvestedCount === 14) {
+                // Increment the full tray harvest count
+                tray.totalHarvests = (tray.totalHarvests || 0) + 1;
+
+                // If this tray has been fully harvested 5 times (70 pods), expire the windmill
+                if (tray.totalHarvests === 5) {
+                    // Award the user 350 tokens & score
+                    user.balance_tokens += 350;
+                    user.gameScore += 350;
+
+                    // Mark the windmill as expired
+                    tray.windmillExpired = true;
+                    tray.windmill = null;
+
+                    // Optionally, create a transaction record for the 350
+                    const windmillBonusTransaction = new Transaction({
+                        userId: user._id,
+                        itemId: tray.windmill, // or some placeholder if you want
+                        timestamp: new Date(),
+                        amount_tokens: 350,
+                        quantity: 1,
+                        type: 'windmill-harvest-bonus'
+                    });
+                    await windmillBonusTransaction.save();
+
+                    console.log(`Tray ${trayNumber} harvested all 70 pods. Windmill expired. Awarded 350 tokens & score.`);
+                }
+            }
+        }
+        // ---------- WINDMILL LOGIC END ----------
 
         // Save the updated user
         await user.save();
@@ -255,6 +265,7 @@ router.post('/:userId/pods/:podId/harvest', async (req, res) => {
         res.status(500).json({ error: "Failed to harvest pod." });
     }
 });
+
 
 
 
@@ -405,51 +416,87 @@ router.post('/:userId/clear-tray/:trayNumber', async (req, res) => {
     }
 });
 
-// POST /api/seedPods/:userId/trays/:trayNumber/assign-solar-panel
-router.post('/:userId/trays/:trayNumber/assign-solar-panel', async (req, res) => {
+//// POST /api/seedPods/:userId/trays/:trayNumber/assign-solar-panel
+//router.post('/:userId/trays/:trayNumber/assign-solar-panel', async (req, res) => {
+//    const { userId, trayNumber } = req.params;
+//    const { solarPanelId } = req.body; // the ID of the solar panel in the user's inventory
+
+//    try {
+//        // 1) Fetch User
+//        const user = await User.findById(userId);
+//        if (!user) {
+//            return res.status(404).json({ error: 'User not found.' });
+//        }
+
+//        // 2) Find the tray
+//        const tray = user.trays.find((t) => t.number === parseInt(trayNumber));
+//        if (!tray) {
+//            return res.status(400).json({ error: 'Tray not found.' });
+//        }
+
+//        // 3) Check if user owns the solar panel (assuming we keep them in user.solarPanels or in user.inventory)
+//        //    If you store panels in user.solarPanels, use that. Otherwise, if you store them in "inventory", check there.
+//        const panelOwned = user.solarPanels.some((panelId) => panelId.toString() === solarPanelId);
+//        if (!panelOwned) {
+//            return res.status(400).json({ error: 'User does not own this solar panel.' });
+//        }
+
+//        // 4) Check if this tray already has a solar panel assigned and not expired
+//        if (tray.solarPanel && !tray.solarPanelExpired) {
+//            return res.status(400).json({ error: 'This tray already has an active solar panel assigned.' });
+//        }
+
+//        // 5) Assign the solar panel to the tray
+//        tray.solarPanel = solarPanelId;
+//        tray.solarPanelExpired = false; // reset in case it was previously expired
+
+//        // 6) Save the user
+//        await user.save();
+
+//        res.json({ success: true, message: `Solar panel assigned to tray ${trayNumber}.`, tray });
+//    } catch (error) {
+//        console.error('Error assigning solar panel:', error);
+//        res.status(500).json({ error: 'Failed to assign solar panel to tray.' });
+//    }
+//});
+
+
+// Assign either Solar Panel or Windmill to a Tray
+router.post('/:userId/trays/:trayNumber/assign-item', async (req, res) => {
     const { userId, trayNumber } = req.params;
-    const { solarPanelId } = req.body; // the ID of the solar panel in the user's inventory
+    const { itemId, itemType } = req.body;
 
     try {
-        // 1) Fetch User
         const user = await User.findById(userId);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found.' });
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+
+        // Fetch the tray
+        const tray = user.trays.find(t => t.number === parseInt(trayNumber));
+        if (!tray) return res.status(404).json({ error: 'Tray not found.' });
+
+        // Check if tray already has an item assigned (solar panel or windmill)
+        if (tray.solarPanel || tray.windmill) {
+            return res.status(400).json({ error: 'This tray already has an item assigned.' });
         }
 
-        // 2) Find the tray
-        const tray = user.trays.find((t) => t.number === parseInt(trayNumber));
-        if (!tray) {
-            return res.status(400).json({ error: 'Tray not found.' });
+        // Add the item to the tray based on itemType
+        if (itemType === 'solarPanel') {
+            tray.solarPanel = itemId;  // Assign Solar Panel
+        } else if (itemType === 'windmill') {
+            tray.windmill = itemId;  // Assign Windmill
+        } else {
+            return res.status(400).json({ error: 'Invalid item type. Use "solarPanel" or "windmill".' });
         }
 
-        // 3) Check if user owns the solar panel (assuming we keep them in user.solarPanels or in user.inventory)
-        //    If you store panels in user.solarPanels, use that. Otherwise, if you store them in "inventory", check there.
-        const panelOwned = user.solarPanels.some((panelId) => panelId.toString() === solarPanelId);
-        if (!panelOwned) {
-            return res.status(400).json({ error: 'User does not own this solar panel.' });
-        }
-
-        // 4) Check if this tray already has a solar panel assigned and not expired
-        if (tray.solarPanel && !tray.solarPanelExpired) {
-            return res.status(400).json({ error: 'This tray already has an active solar panel assigned.' });
-        }
-
-        // 5) Assign the solar panel to the tray
-        tray.solarPanel = solarPanelId;
-        tray.solarPanelExpired = false; // reset in case it was previously expired
-
-        // 6) Save the user
+        // Save the updated user
         await user.save();
 
-        res.json({ success: true, message: `Solar panel assigned to tray ${trayNumber}.`, tray });
+        res.json({ success: true, message: `Item assigned to tray ${trayNumber}.`, tray });
     } catch (error) {
-        console.error('Error assigning solar panel:', error);
-        res.status(500).json({ error: 'Failed to assign solar panel to tray.' });
+        console.error('Error assigning item to tray:', error);
+        res.status(500).json({ error: 'Failed to assign item to tray.' });
     }
 });
-
-
 
 
 
