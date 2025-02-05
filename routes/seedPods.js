@@ -499,6 +499,45 @@ router.post('/:userId/trays/:trayNumber/assign-item', async (req, res) => {
 });
 
 
+// Clear a single pod’s tray assignment
+router.post('/:userId/pods/:podId/clear', async (req, res) => {
+    const { userId, podId } = req.params;
+
+    try {
+        // 1. Fetch the user document
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found.' });
+        }
+
+        // 2. Locate the specific pod by its ID
+        const pod = user.seedPods.id(podId);
+        if (!pod) {
+            return res.status(404).json({ error: 'Seed pod not found.' });
+        }
+
+        // 3. Clear only this pod’s tray and position
+        pod.tray = null;
+        pod.position = null;
+
+        // Optional: If you’d also like to revert the pod to an 'unplanted' state:
+        // pod.status = 'unplanted';
+        // pod.planted = false;
+
+        // 4. Save the updated user document
+        await user.save();
+
+        // 5. Respond with a success message
+        res.json({
+            success: true,
+            message: `Pod ${podId} has been cleared from its tray.`,
+            clearedPod: pod
+        });
+    } catch (error) {
+        console.error('Error clearing pod from tray:', error);
+        res.status(500).json({ error: 'Failed to clear this pod’s tray assignment.' });
+    }
+});
 
 
 

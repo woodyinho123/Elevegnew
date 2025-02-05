@@ -66,30 +66,52 @@ router.post('/purchase', async (req, res) => {
         }
 
         // ================== HANDLE SEEDS ==================
-        if (item.category === 'seed' || item.category === 'seedBox') {
-            const currentPodCount = user.seedPods.length;
-            if (currentPodCount + qty > 56) {
-                return res.status(400).json({
-                    error: `You currently have ${currentPodCount} pods. Buying ${qty} more would exceed the 56-pod limit.`,
-                });
-            }
+if (item.category === 'seed' || item.category === 'seedBox') {
+    const currentPodCount = user.seedPods.length;
+    const podsToAdd = item.category === 'seedBox' ? 14 * qty : qty;
 
-            for (let i = 0; i < qty; i++) {
-                user.seedPods.push({
-                    status: 'unplanted',
-                    planted: false,
-                    tray: null,
-                    position: null,
-                    fertilizerApplied: false,
-                    growthDays: 0,
-                    growthToday: 0,
-                    dailyWaterUsage: 0,
-                    dailyFertilizerUsage: 0,
-                    lastUsageDate: null,
-                    lastGrowthDate: null,
-                });
-            }
-        }
+    console.log(`User currently has ${currentPodCount} pods.`);
+    console.log(`Item category: ${item.category}`);
+    console.log(`Quantity purchased: ${qty}`);
+    console.log(`Total pods to add: ${podsToAdd}`);
+
+    if (currentPodCount + podsToAdd > 56) {
+        return res.status(400).json({
+            error: `You currently have ${currentPodCount} pods. Buying ${podsToAdd} more would exceed the 56-pod limit.`,
+        });
+    }
+
+    // ?? FIX: Declare `newPods` before using it
+    let newPods = [];
+
+    // ?? Create new seed pods and store them in `newPods`
+    for (let i = 0; i < podsToAdd; i++) {
+        newPods.push({
+            status: 'unplanted',
+            planted: false,
+            tray: null,
+            position: null,
+            fertilizerApplied: false,
+            growthDays: 0,
+            growthToday: 0,
+            dailyWaterUsage: 0,
+            dailyFertilizerUsage: 0,
+            lastUsageDate: null,
+            lastGrowthDate: null,
+        });
+
+        console.log(`Prepared pod #${i + 1}`);
+    }
+
+    // ?? Append newPods to the existing seedPods array using `set()`
+    user.set('seedPods', [...user.seedPods, ...newPods]);
+
+    console.log(`Total seed pods after loop: ${user.seedPods.length}`);
+
+    // ?? Save the user document
+    await user.save();
+    console.log("User successfully saved to database.");
+}
 
         // =================== HANDLE FERTILIZER ===================
         if (item.category === 'Supplies' && item.name === 'Fertilizer Pack') {

@@ -1,4 +1,13 @@
 //server.js
+
+require('dotenv').config();  // Load environment variables
+
+const OpenAI = require("openai");
+
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY  // Fetch API key from .env
+    });
+
 const express = require('express');
 const connectDB = require('./config/db');
 const dotenv = require('dotenv');
