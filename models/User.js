@@ -154,10 +154,21 @@ const userSchema = new Schema({
       // New Fields for Token Store
     balance_tokens: {
         type: Number,
-        default: 100 // Starting tokens
+        default: 120 // Starting tokens
     },
 
-    trays: [traySchema], // Array to store trays
+    trays: {             //give user a tray upon registeration
+        type: [traySchema],
+        default: () => [{
+            number: 1,
+            purchasedAt: new Date(),
+            solarPanel: null,
+            windmill: null,
+            solarPanelExpired: false,
+            windmillExpired: false,
+            totalHarvests: 0
+        }]
+    },
 
     solarPanels: [{
         type: mongoose.Schema.Types.ObjectId,

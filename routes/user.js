@@ -44,6 +44,7 @@ router.post('/register', async (req, res) => {
             seasonalInspiredMenus,
             gameRegistration: false,  // ?? User is NOT registered for the game yet
             gameScore: 0,
+            balance_tokens: 120, // Ensure tokens are being initialized
             trays: [{  // ?? Assign a starting tray
                 number: 1,
                 purchasedAt: new Date(),
@@ -54,6 +55,10 @@ router.post('/register', async (req, res) => {
                 totalHarvests: 0
                 }]
         });
+
+        // **DEBUG: Log user before saving**
+        console.log("User before saving:", user);
+
         await user.save();
 
         const payload = { user: { id: user.id } };
