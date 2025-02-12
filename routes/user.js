@@ -41,7 +41,19 @@ router.post('/register', async (req, res) => {
             specialDietaryRequirements,
             culturalDiets,
             chefInspiredMenus,
-            seasonalInspiredMenus });
+            seasonalInspiredMenus,
+            gameRegistration: false,  // ?? User is NOT registered for the game yet
+            gameScore: 0,
+            trays: [{  // ?? Assign a starting tray
+                number: 1,
+                purchasedAt: new Date(),
+                solarPanel: null,
+                windmill: null,
+                solarPanelExpired: false,
+                windmillExpired: false,
+                totalHarvests: 0
+                }]
+        });
         await user.save();
 
         const payload = { user: { id: user.id } };

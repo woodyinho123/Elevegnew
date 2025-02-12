@@ -130,6 +130,31 @@ if (item.category === 'seed' || item.category === 'seedBox') {
             await user.save();
         }
 
+         // ================== HANDLE TRAY PURCHASE ==================
+        if (item.category === 'tray') {
+            for (let i = 0; i < qty; i++) {
+                const newTrayNumber = user.trays.length + 1; // Assign next tray number
+
+                user.trays.push({
+                    number: newTrayNumber,
+                    purchasedAt: new Date(),
+                    solarPanel: null,
+                    windmill: null,
+                    solarPanelExpired: false,
+                    windmillExpired: false,
+                    totalHarvests: 0
+                });
+
+                console.log(`Tray purchased! Assigned tray number: ${newTrayNumber}`);
+            }
+
+            console.log(`Total trays after purchase: ${user.trays.length}`);
+
+            // Force Mongoose to track modifications
+            user.markModified('trays');
+        }
+
+
 
         // ================== HANDLE SOLAR PANELS ==================
         if (item.category === 'equipment' && item.name === 'Solar Panel') {
