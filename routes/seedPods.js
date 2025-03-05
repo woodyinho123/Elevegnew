@@ -499,7 +499,10 @@ router.post('/:userId/trays/:trayNumber/assign-item', async (req, res) => {
 });
 
 
-// Clear a single pod’s tray assignment
+// Clear a specific pod’s tray assignment and remove from seedPods array
+//After clearing the pod's tray and position (pod.tray = null; pod.position = null;), we use the pull method to remove the pod from the seedPods array:
+//user.seedPods.pull(podId);
+
 router.post('/:userId/pods/:podId/clear', async (req, res) => {
     const { userId, podId } = req.params;
 
@@ -520,9 +523,8 @@ router.post('/:userId/pods/:podId/clear', async (req, res) => {
         pod.tray = null;
         pod.position = null;
 
-        // Optional: If you’d also like to revert the pod to an 'unplanted' state:
-        // pod.status = 'unplanted';
-        // pod.planted = false;
+        // Remove the pod from the seedPods array
+        user.seedPods.pull(podId);
 
         // 4. Save the updated user document
         await user.save();
@@ -530,7 +532,7 @@ router.post('/:userId/pods/:podId/clear', async (req, res) => {
         // 5. Respond with a success message
         res.json({
             success: true,
-            message: `Pod ${podId} has been cleared from its tray.`,
+            message: `Pod ${podId} has been cleared from its tray and removed from the seedPods array.`,
             clearedPod: pod
         });
     } catch (error) {
@@ -538,6 +540,31 @@ router.post('/:userId/pods/:podId/clear', async (req, res) => {
         res.status(500).json({ error: 'Failed to clear this pod’s tray assignment.' });
     }
 });
+
+// Fetch all unassigned pods for a specific user
+router.get('/:userId/pods/unassigned', async (req, res) => {
+    const { userId } = req.params;
+
+    try {
+        // Fetch user from database
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ error: "User not found." });
+
+        // Fetch all seed pods that are unassigned (tray is null)
+        const unassignedPods = user.seedPods.filter(pod => pod.tray === null);
+
+        // If no unassigned pods, return a message
+        if (unassignedPods.length === 0) {
+            return res.status(404).json({ message: "No unassigned pods found." });
+        }
+
+        res.json(unassignedPods );
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch unassigned pods." });
+    }
+});
+
 
 
 

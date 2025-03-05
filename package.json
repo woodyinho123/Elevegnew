@@ -20,7 +20,8 @@
     "mongoose": "^8.5.1",
     "node-cron": "^3.0.3",
     "node-schedule": "^2.1.1",
-    "openai": "^4.56.0"
+    "openai": "^4.56.0",
+    "ws": "^8.18.1"
   },
   "devDependencies": {
     "eslint": "^9.7.0"

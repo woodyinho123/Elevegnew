@@ -22,6 +22,7 @@ const seedPodsRoutes = require('./routes/seedPods');
 const cron = require('node-cron');
 const Transaction = require('./models/Transaction'); // Ensure this import
 const Fertilizer = require('./models/Fertilizer');
+//const wss = require('./websocketServer');              board code on hold for now
 
 // Load environment variables
 dotenv.config();
@@ -59,7 +60,7 @@ app.use('/api/utils', require('./routes/utils'));
 app.use('/api', userRoutes);
 app.use('/api', seedPodsRoutes);
 app.use('/api/seedPods', require('./routes/seedPods'));
-app.use('/api/seedPods', require('./routes/seedPods'))
+
 
 
 const job = schedule.scheduleJob('0 0 * * 0', async function () {
